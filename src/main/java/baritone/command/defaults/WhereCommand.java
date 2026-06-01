@@ -22,13 +22,13 @@ import baritone.api.command.Command;
 import baritone.api.command.argument.IArgConsumer;
 import baritone.api.command.exception.CommandException;
 import baritone.api.command.exception.CommandInvalidStateException;
+import com.mojang.datafixers.util.Pair;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderSet;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.levelgen.structure.Structure;
 
 import java.util.Arrays;
@@ -72,17 +72,12 @@ public class WhereCommand extends Command {
         }
 
         // With argument — locate a structure
-        String input   = args.getString().toLowerCase();
-        String tagPath = StructureCommand.ALIASES.getOrDefault(input, input);
-
-        TagKey<Structure> tag = TagKey.create(
-            Registries.STRUCTURE,
-            Identifier.withDefaultNamespace(tagPath)
-        );
+        String input = args.getString().toLowerCase();
+        String query = StructureCommand.ALIASES.getOrDefault(input, "tag:" + input);
 
         final BlockPos origin = ctx.playerFeet();
 
-        // Singleplayer path — use the integrated server.
+        // ── Singleplayer path ────────────────────────────────────────────────
         MinecraftServer server = Minecraft.getInstance().getSingleplayerServer();
         if (server != null) {
             ServerLevel serverLevel = server.getLevel(ctx.world().dimension());
@@ -90,25 +85,33 @@ public class WhereCommand extends Command {
                 throw new CommandInvalidStateException(
                     "Current dimension is not available on the integrated server.");
             }
-            logDirect("Searching for nearest '" + tagPath + "'...");
+            HolderSet<Structure> holderSet = StructureCommand.resolveStructures(query, serverLevel);
+            if (holderSet == null) {
+                logDirect("Unknown structure: '" + input + "'. Check #help structure for a list.");
+                return;
+            }
+            logDirect("Searching for nearest '" + input + "'...");
             Thread t = new Thread(() -> {
-                BlockPos found;
+                Pair<BlockPos, Holder<Structure>> found;
                 try {
-                    found = serverLevel.findNearestMapStructure(tag, origin, 100, false);
+                    found = serverLevel.getChunkSource().getGenerator()
+                        .findNearestMapStructure(serverLevel, holderSet, origin, 100, false);
                 } catch (Exception e) {
                     Minecraft.getInstance().execute(() ->
                         logDirect("Search failed: " + e.getMessage()));
                     return;
                 }
-                final BlockPos result = found;
+                final BlockPos result = found == null ? null : found.getFirst();
                 Minecraft.getInstance().execute(() -> {
                     if (result == null) {
-                        logDirect("No '" + tagPath + "' found within ~1600 blocks.");
+                        logDirect("No '" + input + "' found within range.");
                         return;
                     }
-                    int dist = (int) Math.sqrt(origin.distSqr(result));
+                    int dx2 = result.getX() - origin.getX();
+                    int dz2 = result.getZ() - origin.getZ();
+                    int dist = (int) Math.sqrt(dx2 * dx2 + dz2 * dz2);
                     String dir = compassDirection(origin, result);
-                    logDirect(tagPath + ":"
+                    logDirect(input + ":"
                         + "  X=" + result.getX()
                         + "  Z=" + result.getZ()
                         + "  |  " + dir
@@ -121,25 +124,24 @@ public class WhereCommand extends Command {
             return;
         }
 
-        // Multiplayer path — use seed-based client-side finder.
-        if (tagPath.equals("strongholds")) {
+        // ── Multiplayer path ─────────────────────────────────────────────────
+        if (query.equals("tag:eye_of_ender_located")) {
             logDirect("Strongholds require biome data not available client-side.");
-            logDirect("Use  chunkbase.com  with seed " +
-                (ClientStructureFinder.hasSeed() ? ClientStructureFinder.getSeed() : "<enter with #seedinput>") +
-                "  to find the nearest stronghold.");
+            logDirect("Use chunkbase.com with seed "
+                + (ClientStructureFinder.hasSeed() ? ClientStructureFinder.getSeed() : "<enter with #seedinput>")
+                + " to find the nearest stronghold.");
             return;
         }
         if (!ClientStructureFinder.hasSeed()) {
             throw new CommandInvalidStateException(
-                "You are on multiplayer. Enter your world seed first:  #seedinput <seed>"
-            );
+                "You are on multiplayer. Enter your world seed first:  #seedinput <seed>");
         }
-        logDirect("Searching for nearest '" + tagPath + "' using stored seed " +
-            ClientStructureFinder.getSeed() + "...");
+        logDirect("Searching for nearest '" + input + "' using stored seed "
+            + ClientStructureFinder.getSeed() + "...");
         Thread t = new Thread(() -> {
             BlockPos result;
             try {
-                result = ClientStructureFinder.findNearest(tag, origin, 100);
+                result = ClientStructureFinder.findNearest(query, origin, 100);
             } catch (Exception e) {
                 Minecraft.getInstance().execute(() ->
                     logDirect("Search failed: " + e.getMessage()));
@@ -147,13 +149,14 @@ public class WhereCommand extends Command {
             }
             Minecraft.getInstance().execute(() -> {
                 if (result == null) {
-                    logDirect("No '" + tagPath + "' found within ~1600 blocks.");
-                    logDirect("Check chunkbase.com for the exact location.");
+                    logDirect("No '" + input + "' found within range (seed-based search).");
+                    logDirect("Check chunkbase.com with seed "
+                        + ClientStructureFinder.getSeed() + " for exact coordinates.");
                     return;
                 }
                 int dist = (int) Math.sqrt(origin.distSqr(result));
                 String dir = compassDirection(origin, result);
-                logDirect(tagPath + " (seed-based):"
+                logDirect(input + " (seed-based):"
                     + "  X=" + result.getX()
                     + "  Z=" + result.getZ()
                     + "  |  " + dir

@@ -25,6 +25,8 @@ import baritone.api.command.exception.CommandException;
 import baritone.api.command.exception.CommandInvalidStateException;
 import baritone.api.command.helpers.TabCompleteHelper;
 import baritone.api.pathing.goals.Goal;
+import baritone.api.pathing.goals.GoalBlock;
+import baritone.api.pathing.goals.GoalXZ;
 import baritone.api.process.ICustomGoalProcess;
 import baritone.api.process.IElytraProcess;
 import net.minecraft.ChatFormatting;
@@ -33,7 +35,6 @@ import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.world.level.Level;
 
 import java.util.Arrays;
 import java.util.List;
@@ -69,10 +70,8 @@ public class ElytraCommand extends Command {
             }
             Goal iGoal = customGoalProcess.mostRecentGoal();
             if (iGoal == null) {
-                throw new CommandInvalidStateException("No goal has been set");
-            }
-            if (ctx.world().dimension() != Level.NETHER) {
-                throw new CommandInvalidStateException("Only works in the nether");
+                throw new CommandInvalidStateException(
+                    "No goal set. Use  #elytra goto X Z  to fly to coordinates.");
             }
             try {
                 elytra.pathTo(iGoal);
@@ -84,6 +83,49 @@ public class ElytraCommand extends Command {
 
         final String action = args.getString();
         switch (action) {
+            case "goto": {
+                // #elytra goto X Z   or   #elytra goto X Y Z
+                if (Baritone.settings().elytraTermsAccepted.value) {
+                    if (detectOn2b2t()) warn2b2t();
+                } else {
+                    gatekeep();
+                }
+                if (!args.hasAny()) {
+                    throw new CommandInvalidStateException(
+                        "Usage:  #elytra goto X Z   or   #elytra goto X Y Z");
+                }
+                String s1 = args.getString();
+                if (!args.hasAny()) {
+                    throw new CommandInvalidStateException(
+                        "Usage:  #elytra goto X Z   or   #elytra goto X Y Z");
+                }
+                String s2 = args.getString();
+                Goal goal;
+                try {
+                    int x = Integer.parseInt(s1);
+                    if (args.hasAny()) {
+                        // three numbers: X Y Z
+                        int y = Integer.parseInt(s2);
+                        int z = Integer.parseInt(args.getString());
+                        goal = new GoalBlock(x, y, z);
+                        logDirect("Flying to  X=" + x + "  Y=" + y + "  Z=" + z);
+                    } else {
+                        // two numbers: X Z
+                        int z = Integer.parseInt(s2);
+                        goal = new GoalXZ(x, z);
+                        logDirect("Flying to  X=" + x + "  Z=" + z);
+                    }
+                } catch (NumberFormatException e) {
+                    throw new CommandInvalidStateException(
+                        "Invalid coordinates. Usage:  #elytra goto X Z   or   #elytra goto X Y Z");
+                }
+                try {
+                    elytra.pathTo(goal);
+                } catch (IllegalArgumentException ex) {
+                    throw new CommandInvalidStateException(ex.getMessage());
+                }
+                break;
+            }
             case "reset": {
                 elytra.resetState();
                 logDirect("Reset state but still flying to same goal");
@@ -95,7 +137,8 @@ public class ElytraCommand extends Command {
                 break;
             }
             default: {
-                throw new CommandInvalidStateException("Invalid action");
+                throw new CommandInvalidStateException(
+                    "Unknown action '" + action + "'. Try:  #elytra goto X Z  |  reset  |  repack");
             }
         }
     }
@@ -189,7 +232,7 @@ public class ElytraCommand extends Command {
     public Stream<String> tabComplete(String label, IArgConsumer args) throws CommandException {
         TabCompleteHelper helper = new TabCompleteHelper();
         if (args.hasExactlyOne()) {
-            helper.append("reset", "repack", "supported");
+            helper.append("goto", "reset", "repack", "supported");
         }
         return helper.filterPrefix(args.getString()).stream();
     }
@@ -202,13 +245,17 @@ public class ElytraCommand extends Command {
     @Override
     public List<String> getLongDesc() {
         return Arrays.asList(
-                "The elytra command tells baritone to, in the nether, automatically fly to the current goal.",
+                "Fly to a destination using elytra and firework rockets. Works in any dimension.",
                 "",
                 "Usage:",
-                "> elytra - fly to the current goal",
-                "> elytra reset - Resets the state of the process, but will try to keep flying to the same goal.",
-                "> elytra repack - Queues all of the chunks in render distance to be given to the native library.",
-                "> elytra supported - Tells you if baritone ships a native library that is compatible with your PC."
+                "> elytra goto X Z         - fly to X, Z (any Y)",
+                "> elytra goto X Y Z       - fly to an exact block position",
+                "> elytra                  - fly to the current goal (set with #goal beforehand)",
+                "> elytra reset            - reset pathfinding state (keeps flying to same goal)",
+                "> elytra repack           - repack all loaded chunks into the pathfinder",
+                "> elytra supported        - check if the native library loaded correctly",
+                "",
+                "Requires: elytra in chestplate slot + firework rockets in inventory."
         );
     }
 

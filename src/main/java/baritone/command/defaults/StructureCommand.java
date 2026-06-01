@@ -23,10 +23,16 @@ import baritone.api.command.argument.IArgConsumer;
 import baritone.api.command.exception.CommandException;
 import baritone.api.command.exception.CommandInvalidStateException;
 import baritone.api.pathing.goals.GoalBlock;
+import baritone.api.pathing.goals.GoalXZ;
+import com.mojang.datafixers.util.Pair;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.HolderSet;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.TagKey;
@@ -39,54 +45,66 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 /**
- * Locates the nearest named structure (stronghold, village, etc.) and navigates there.
+ * Locates the nearest named structure and navigates there.
  *
- * Works in singleplayer by delegating to the integrated server's structure finder —
- * which knows about all structures in the world regardless of whether they are
- * currently loaded.  In multiplayer the server structure-finder is unavailable;
- * if you already know the coordinates (e.g. from a seed calculator), use
- * {@code #goto X ~ Z} instead.
+ * <p>In singleplayer the integrated server's ChunkGenerator is queried directly,
+ * which covers every structure in the world generator regardless of whether
+ * the chunks are loaded.
  *
- * Usage:
- *   #structure stronghold          - find and go to nearest stronghold
- *   #structure village             - find and go to nearest village
- *   #structure <tag>               - find any structure whose registry tag matches
+ * <p>In multiplayer, a stored world seed (entered via {@code #seedinput}) is used
+ * together with the client's registry data to find structures via their
+ * RandomSpreadStructurePlacement grid math.
+ *
+ * <p>Each alias resolves to either {@code "tag:<tagPath>"} (a StructureTags entry that
+ * exists in MC 26.1) or {@code "id:<structureId>"} (a direct structure registry ID for
+ * structures that have no tag).  The tag names in MC 26.1 are singular, not plural.
  */
 public class StructureCommand extends Command {
 
-    // Maps short player-facing names to Minecraft structure tag paths.
-    // Tags use the plural form as registered in net.minecraft.tags.StructureTags.
-    // Package-accessible so WhereCommand can share the same table without duplication.
+    /**
+     * Maps user-facing names to a query string used internally.
+     * Format: {@code "tag:<tagPath>"} or {@code "id:<structureId>"}.
+     *
+     * <p>Package-accessible so {@link WhereCommand} can share the table.
+     */
     static final Map<String, String> ALIASES = new HashMap<>();
     static {
-        ALIASES.put("stronghold",        "strongholds");
-        ALIASES.put("village",           "villages");
-        ALIASES.put("nether_fortress",   "fortresses");
-        ALIASES.put("fortress",          "fortresses");
-        ALIASES.put("bastion",           "bastions");
-        ALIASES.put("bastion_remnant",   "bastions");
-        ALIASES.put("mansion",           "mansions");
-        ALIASES.put("woodland_mansion",  "mansions");
-        ALIASES.put("monument",          "monuments");
-        ALIASES.put("ocean_monument",    "monuments");
-        ALIASES.put("mineshaft",         "mineshafts");
-        ALIASES.put("buried_treasure",   "buried_treasures");
-        ALIASES.put("desert_pyramid",    "desert_pyramids");
-        ALIASES.put("desert_temple",     "desert_pyramids");
-        ALIASES.put("jungle_pyramid",    "jungle_pyramids");
-        ALIASES.put("jungle_temple",     "jungle_pyramids");
-        ALIASES.put("pillager_outpost",  "pillager_outposts");
-        ALIASES.put("outpost",           "pillager_outposts");
-        ALIASES.put("end_city",          "end_cities");
-        ALIASES.put("ancient_city",      "ancient_cities");
-        ALIASES.put("trail_ruins",       "trail_ruins");
-        ALIASES.put("ruined_portal",     "ruined_portals");
-        ALIASES.put("shipwreck",         "shipwrecks");
-        ALIASES.put("igloo",             "igloos");
-        ALIASES.put("swamp_hut",         "swamp_huts");
-        ALIASES.put("witch_hut",         "swamp_huts");
-        ALIASES.put("ocean_ruin",        "ocean_ruins");
-        ALIASES.put("ocean_ruins",       "ocean_ruins");
+        // --- structures with a StructureTags entry in MC 26.1 (all singular) ---
+        ALIASES.put("village",           "tag:village");
+        ALIASES.put("mineshaft",         "tag:mineshaft");
+        ALIASES.put("mine",              "tag:mineshaft");
+        ALIASES.put("shipwreck",         "tag:shipwreck");
+        ALIASES.put("ruined_portal",     "tag:ruined_portal");
+        ALIASES.put("ocean_ruin",        "tag:ocean_ruin");
+        ALIASES.put("ocean_ruins",       "tag:ocean_ruin");
+
+        // these structures are identified by their explorer-map tags
+        ALIASES.put("stronghold",        "tag:eye_of_ender_located");
+        ALIASES.put("mansion",           "tag:on_woodland_explorer_maps");
+        ALIASES.put("woodland_mansion",  "tag:on_woodland_explorer_maps");
+        ALIASES.put("monument",          "tag:on_ocean_explorer_maps");
+        ALIASES.put("ocean_monument",    "tag:on_ocean_explorer_maps");
+        ALIASES.put("buried_treasure",   "tag:on_treasure_maps");
+        ALIASES.put("jungle_pyramid",    "tag:on_jungle_explorer_maps");
+        ALIASES.put("jungle_temple",     "tag:on_jungle_explorer_maps");
+        ALIASES.put("swamp_hut",         "tag:on_swamp_explorer_maps");
+        ALIASES.put("witch_hut",         "tag:on_swamp_explorer_maps");
+        ALIASES.put("trial_chambers",    "tag:on_trial_chambers_maps");
+        ALIASES.put("trial_chamber",     "tag:on_trial_chambers_maps");
+
+        // --- structures with no StructureTags entry in MC 26.1 (use direct ID) ---
+        ALIASES.put("nether_fortress",   "id:fortress");
+        ALIASES.put("fortress",          "id:fortress");
+        ALIASES.put("bastion",           "id:bastion_remnant");
+        ALIASES.put("bastion_remnant",   "id:bastion_remnant");
+        ALIASES.put("ancient_city",      "id:ancient_city");
+        ALIASES.put("end_city",          "id:end_city");
+        ALIASES.put("desert_pyramid",    "id:desert_pyramid");
+        ALIASES.put("desert_temple",     "id:desert_pyramid");
+        ALIASES.put("pillager_outpost",  "id:pillager_outpost");
+        ALIASES.put("outpost",           "id:pillager_outpost");
+        ALIASES.put("igloo",             "id:igloo");
+        ALIASES.put("trail_ruins",       "id:trail_ruins");
     }
 
     public StructureCommand(IBaritone baritone) {
@@ -99,47 +117,49 @@ public class StructureCommand extends Command {
         args.requireMax(1);
 
         String input = args.getString().toLowerCase();
-
-        // Resolve alias (or pass through as-is for raw tag paths)
-        String tagPath = ALIASES.getOrDefault(input, input);
-
-        TagKey<Structure> tag = TagKey.create(
-            Registries.STRUCTURE,
-            Identifier.withDefaultNamespace(tagPath)
-        );
+        // e.g. "tag:village" or "id:fortress"; default to tag lookup for unknown names
+        String query = ALIASES.getOrDefault(input, "tag:" + input);
 
         final BlockPos searchOrigin = ctx.playerFeet();
 
-        // Singleplayer: delegate to the integrated server (accurate, covers unexplored areas).
+        // ── Singleplayer path ────────────────────────────────────────────────
         MinecraftServer server = Minecraft.getInstance().getSingleplayerServer();
         if (server != null) {
             ServerLevel serverLevel = server.getLevel(ctx.world().dimension());
             if (serverLevel == null) {
                 throw new CommandInvalidStateException(
-                    "Current dimension is not available on the integrated server."
-                );
+                    "Current dimension is not available on the integrated server.");
             }
-            logDirect("Searching for nearest '" + tagPath + "' — this may take a moment...");
+            HolderSet<Structure> holderSet = resolveStructures(query, serverLevel);
+            if (holderSet == null) {
+                logDirect("Unknown structure: '" + input + "'. Check #help structure for a list.");
+                return;
+            }
+            logDirect("Searching for nearest '" + input + "'...");
             Thread searchThread = new Thread(() -> {
-                BlockPos found;
+                Pair<BlockPos, Holder<Structure>> found;
                 try {
-                    found = serverLevel.findNearestMapStructure(tag, searchOrigin, 100, false);
+                    found = serverLevel.getChunkSource().getGenerator()
+                        .findNearestMapStructure(serverLevel, holderSet, searchOrigin, 100, false);
                 } catch (Exception e) {
                     Minecraft.getInstance().execute(() ->
                         logDirect("Structure search failed: " + e.getMessage()));
                     return;
                 }
-                final BlockPos result = found;
+                final BlockPos result = found == null ? null : found.getFirst();
                 Minecraft.getInstance().execute(() -> {
                     if (result == null) {
-                        logDirect("No '" + tagPath + "' found within ~1600 blocks. Try exploring further.");
+                        logDirect("No '" + input + "' found within search range. "
+                            + "Try exploring further or increasing the search area.");
                         return;
                     }
-                    int dist = (int) Math.sqrt(searchOrigin.distSqr(result));
-                    logDirect("Found '" + tagPath + "' at " +
-                        result.getX() + ", " + result.getY() + ", " + result.getZ() +
-                        "  (~" + dist + " blocks away)");
-                    baritone.getCustomGoalProcess().setGoalAndPath(new GoalBlock(result));
+                    int dx = result.getX() - searchOrigin.getX();
+                    int dz = result.getZ() - searchOrigin.getZ();
+                    int dist = (int) Math.sqrt(dx * dx + dz * dz);
+                    logDirect("Found '" + input + "'  X=" + result.getX()
+                        + "  Z=" + result.getZ() + "  (~" + dist + " blocks away)");
+                    baritone.getCustomGoalProcess().setGoalAndPath(
+                        new GoalXZ(result.getX(), result.getZ()));
                 });
             }, "BaritoneStructureSearch");
             searchThread.setDaemon(true);
@@ -147,26 +167,26 @@ public class StructureCommand extends Command {
             return;
         }
 
-        // Multiplayer: use client-side seed-based placement math.
-        if (tagPath.equals("strongholds")) {
-            logDirect("Strongholds use biome-based ring placement which cannot be");
-            logDirect("calculated client-side. Use  chunkbase.com  with seed " +
-                (ClientStructureFinder.hasSeed() ? ClientStructureFinder.getSeed() : "<enter with #seedinput>") +
-                "  to find the nearest stronghold, then:  #goto X ~ Z");
+        // ── Multiplayer path ─────────────────────────────────────────────────
+        // Strongholds use ConcentricRings placement which requires biome data.
+        if (query.equals("tag:eye_of_ender_located")) {
+            logDirect("Strongholds use biome-based ring placement — not calculable client-side.");
+            logDirect("Use chunkbase.com with seed "
+                + (ClientStructureFinder.hasSeed() ? ClientStructureFinder.getSeed() : "<enter with #seedinput>")
+                + " to find the nearest stronghold, then:  #goto X ~ Z");
             return;
         }
         if (!ClientStructureFinder.hasSeed()) {
             throw new CommandInvalidStateException(
-                "You are on multiplayer. Enter your world seed first:  #seedinput <seed>\n" +
-                "Then try  #structure " + input + "  again."
-            );
+                "You are on multiplayer. Enter your world seed first:  #seedinput <seed>\n"
+                + "Then try  #structure " + input + "  again.");
         }
-        logDirect("Searching for nearest '" + tagPath + "' using stored seed " +
-            ClientStructureFinder.getSeed() + "...");
+        logDirect("Searching for nearest '" + input + "' using stored seed "
+            + ClientStructureFinder.getSeed() + "...");
         Thread seedThread = new Thread(() -> {
             BlockPos result;
             try {
-                result = ClientStructureFinder.findNearest(tag, searchOrigin, 100);
+                result = ClientStructureFinder.findNearest(query, searchOrigin, 100);
             } catch (Exception e) {
                 Minecraft.getInstance().execute(() ->
                     logDirect("Structure search failed: " + e.getMessage()));
@@ -174,19 +194,53 @@ public class StructureCommand extends Command {
             }
             Minecraft.getInstance().execute(() -> {
                 if (result == null) {
-                    logDirect("No '" + tagPath + "' found within ~1600 blocks.");
-                    logDirect("Try exploring further, or check chunkbase.com for exact coordinates.");
+                    logDirect("No '" + input + "' found within range (seed-based search).");
+                    logDirect("Check chunkbase.com with seed "
+                        + ClientStructureFinder.getSeed() + " for exact coordinates.");
                     return;
                 }
-                int dist = (int) Math.sqrt(searchOrigin.distSqr(result));
-                logDirect("Found '" + tagPath + "' at approx " +
-                    result.getX() + ", ?, " + result.getZ() +
-                    "  (~" + dist + " blocks — seed-based estimate)");
-                baritone.getCustomGoalProcess().setGoalAndPath(new GoalBlock(result));
+                int dx = result.getX() - searchOrigin.getX();
+                int dz = result.getZ() - searchOrigin.getZ();
+                int dist = (int) Math.sqrt(dx * dx + dz * dz);
+                logDirect("Found '" + input + "' (seed-based)  X=" + result.getX()
+                    + "  Z=" + result.getZ() + "  (~" + dist + " blocks away)");
+                baritone.getCustomGoalProcess().setGoalAndPath(
+                    new GoalXZ(result.getX(), result.getZ()));
             });
         }, "BaritoneStructureSeedSearch");
         seedThread.setDaemon(true);
         seedThread.start();
+    }
+
+    /**
+     * Resolves a query string to a {@link HolderSet} of structures.
+     *
+     * @param query    {@code "tag:<tagPath>"} or {@code "id:<structureId>"}
+     * @param level    server level (used for its registry access)
+     * @return the holder set, or {@code null} if the tag/id does not exist
+     */
+    static HolderSet<Structure> resolveStructures(String query, ServerLevel level) {
+        HolderLookup.RegistryLookup<Structure> lookup =
+            level.registryAccess().lookupOrThrow(Registries.STRUCTURE);
+
+        if (query.startsWith("tag:")) {
+            String tagName = query.substring(4);
+            TagKey<Structure> tag = TagKey.create(
+                Registries.STRUCTURE, Identifier.withDefaultNamespace(tagName));
+            var namedOpt = lookup.get(tag);
+            if (namedOpt.isEmpty()) return null;
+            return namedOpt.get();
+
+        } else if (query.startsWith("id:")) {
+            String idName = query.substring(3);
+            ResourceKey<Structure> key = ResourceKey.create(
+                Registries.STRUCTURE, Identifier.withDefaultNamespace(idName));
+            var holderOpt = lookup.get(key);
+            if (holderOpt.isEmpty()) return null;
+            return HolderSet.direct(holderOpt.get());
+        }
+
+        return null;
     }
 
     @Override
@@ -210,18 +264,19 @@ public class StructureCommand extends Command {
     @Override
     public List<String> getLongDesc() {
         return Arrays.asList(
-            "The structure command locates the nearest named structure and tells Baritone to navigate there.",
+            "Finds the nearest named structure and tells Baritone to navigate there.",
             "",
-            "Singleplayer: uses the integrated server's structure locator — searches even unexplored areas.",
-            "Multiplayer: uses seed-based placement math. Enter the world seed first with  #seedinput <seed>.",
-            "  Strongholds are NOT supported on multiplayer (biome-gated ring placement) — use chunkbase.com.",
-            "",
-            "Short aliases are accepted for all common structure types.",
+            "Singleplayer: queries the integrated server's chunk generator — works even",
+            "  for unexplored areas, no seed needed.",
+            "Multiplayer: uses seed-based RandomSpreadStructurePlacement math.",
+            "  Enter your world seed first with  #seedinput <seed>.",
+            "  Strongholds are not supported on multiplayer — use chunkbase.com.",
             "",
             "Usage:",
-            "> structure stronghold       - nearest stronghold (End portal)",
-            "> structure village          - nearest village",
+            "> structure village          - nearest village (any type)",
+            "> structure stronghold       - nearest stronghold (End portal room)",
             "> structure nether_fortress  - nearest Nether fortress",
+            "> structure fortress         - same as nether_fortress",
             "> structure bastion          - nearest bastion remnant",
             "> structure mansion          - nearest woodland mansion",
             "> structure monument         - nearest ocean monument",
@@ -233,7 +288,12 @@ public class StructureCommand extends Command {
             "> structure jungle_pyramid   - nearest jungle temple",
             "> structure pillager_outpost - nearest pillager outpost",
             "> structure shipwreck        - nearest shipwreck",
-            "> structure <tag>            - any other structure tag (plural form, e.g. 'igloos')"
+            "> structure igloo            - nearest igloo",
+            "> structure swamp_hut        - nearest swamp hut / witch hut",
+            "> structure ocean_ruin       - nearest ocean ruin",
+            "> structure ruined_portal    - nearest ruined portal",
+            "> structure trial_chambers   - nearest trial chambers",
+            "> structure trail_ruins      - nearest trail ruins"
         );
     }
 }

@@ -19,10 +19,10 @@ package baritone.command.defaults;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Holder;
-import net.minecraft.core.Registry;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.ChunkPos;
@@ -34,25 +34,28 @@ import net.minecraft.world.level.levelgen.structure.placement.StructurePlacement
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
  * Client-side structure finder that works without a ServerLevel.
  *
- * Uses the world seed (entered via {@code #seedinput}) together with the
+ * <p>Uses the world seed (entered via {@code #seedinput}) together with the
  * client's RegistryAccess to locate structures that use
- * {@link RandomSpreadStructurePlacement}.  Structures that use
- * ConcentricRingsStructurePlacement (i.e. strongholds) require biome data
- * unavailable client-side and are NOT supported — the result will be null
- * for those, and the calling command should tell the user to check a seed map.
+ * {@link RandomSpreadStructurePlacement}.
  *
- * The seed is persisted to {@code baritone/seed.txt} in the game directory
- * so it survives game restarts.
+ * <p>Structures that use ConcentricRingsStructurePlacement (strongholds) require
+ * biome data unavailable client-side and are NOT supported — the result will be
+ * {@code null} for those, and the calling command should show a chunkbase.com hint.
+ *
+ * <p>The seed is persisted to {@code baritone/seed.txt} in the game directory so
+ * it survives game restarts.
  */
 public final class ClientStructureFinder {
 
-    private static volatile long storedSeed = Long.MIN_VALUE; // Long.MIN_VALUE = not set
+    private static volatile long storedSeed = Long.MIN_VALUE; // MIN_VALUE = not set
     private static volatile boolean fileAttempted = false;    // lazy-load guard
     private static final long UNSET = Long.MIN_VALUE;
 
@@ -64,7 +67,7 @@ public final class ClientStructureFinder {
 
     public static void setSeed(long seed) {
         storedSeed = seed;
-        fileAttempted = true; // don't re-read file after explicit set
+        fileAttempted = true;
         try {
             File f = seedFile();
             f.getParentFile().mkdirs();
@@ -93,55 +96,76 @@ public final class ClientStructureFinder {
     // -------------------------------------------------------------------------
 
     /**
-     * Find the nearest structure matching {@code tag} by searching within
+     * Find the nearest structure matching {@code query} within
      * {@code searchChunkRadius} chunks of {@code origin}.
      *
-     * Returns {@code null} if:
-     *   - no seed is stored
-     *   - the registry has no structures for the tag
-     *   - the matching structure set uses ConcentricRingsStructurePlacement (strongholds)
-     *   - no candidate was found within the search radius
+     * @param query  either {@code "tag:<tagPath>"} or {@code "id:<structureId>"}
+     *               — same format as {@link StructureCommand#ALIASES} values.
+     * @return the nearest candidate BlockPos, or {@code null} if not found /
+     *         not supported (e.g. strongholds).
      */
-    public static BlockPos findNearest(TagKey<Structure> tag, BlockPos origin, int searchChunkRadius) {
+    public static BlockPos findNearest(String query, BlockPos origin, int searchChunkRadius) {
         if (!hasSeed()) return null;
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.getConnection() == null) return null;
         RegistryAccess registries = mc.getConnection().registryAccess();
 
-        // Collect all structure ResourceKeys that belong to the tag
-        Registry<Structure> structureReg = registries.registry(Registries.STRUCTURE).orElseThrow();
-        Set<ResourceKey<Structure>> taggedKeys = new HashSet<>();
-        structureReg.getTagOrEmpty(tag).forEach(holder ->
-            holder.unwrapKey().ifPresent(taggedKeys::add));
-        if (taggedKeys.isEmpty()) return null;
+        // Collect the structure ResourceKeys we're searching for.
+        HolderLookup.RegistryLookup<Structure> structureLookup;
+        HolderLookup.RegistryLookup<StructureSet> setLookup;
+        try {
+            structureLookup = registries.lookupOrThrow(Registries.STRUCTURE);
+            setLookup       = registries.lookupOrThrow(Registries.STRUCTURE_SET);
+        } catch (Exception e) {
+            return null; // registries not available yet
+        }
 
-        // Find StructureSets that contain any of those structures
-        Registry<StructureSet> setReg = registries.registry(Registries.STRUCTURE_SET).orElseThrow();
+        Set<ResourceKey<Structure>> targetKeys = new HashSet<>();
 
-        BlockPos nearest = null;
-        long nearestDistSq = Long.MAX_VALUE;
+        if (query.startsWith("tag:")) {
+            String tagName = query.substring(4);
+            TagKey<Structure> tag = TagKey.create(
+                Registries.STRUCTURE, Identifier.withDefaultNamespace(tagName));
+            structureLookup.get(tag).ifPresent(holders ->
+                holders.forEach(h -> h.unwrapKey().ifPresent(targetKeys::add)));
 
-        for (StructureSet set : setReg) {
-            boolean relevant = false;
+        } else if (query.startsWith("id:")) {
+            String idName = query.substring(3);
+            ResourceKey<Structure> key = ResourceKey.create(
+                Registries.STRUCTURE, Identifier.withDefaultNamespace(idName));
+            structureLookup.get(key).ifPresent(h -> h.unwrapKey().ifPresent(targetKeys::add));
+        }
+
+        if (targetKeys.isEmpty()) return null;
+
+        // Find every StructureSet that contains at least one of the target structures.
+        List<StructureSet> matchingSets = new ArrayList<>();
+        setLookup.listElements().forEach(ref -> {
+            StructureSet set = ref.value();
             for (var entry : set.structures()) {
-                if (entry.structure().unwrapKey().map(taggedKeys::contains).orElse(false)) {
-                    relevant = true;
+                if (entry.structure().unwrapKey().map(targetKeys::contains).orElse(false)) {
+                    matchingSets.add(set);
                     break;
                 }
             }
-            if (!relevant) continue;
+        });
 
+        if (matchingSets.isEmpty()) return null;
+
+        BlockPos nearest = null;
+        double nearestDistSq = Double.MAX_VALUE;
+
+        for (StructureSet set : matchingSets) {
             StructurePlacement placement = set.placement();
             if (!(placement instanceof RandomSpreadStructurePlacement rsp)) {
-                // ConcentricRingsStructurePlacement (strongholds) — not supported client-side.
-                // Return null so the caller can show a targeted message.
+                // ConcentricRingsStructurePlacement (strongholds) — needs biome data.
+                // Return null; callers show a targeted message for this case.
                 return null;
             }
-
             BlockPos candidate = findNearestForPlacement(rsp, origin, searchChunkRadius);
             if (candidate != null) {
-                long distSq = origin.distSqr(candidate);
+                double distSq = origin.distSqr(candidate);
                 if (distSq < nearestDistSq) {
                     nearestDistSq = distSq;
                     nearest = candidate;
@@ -160,8 +184,8 @@ public final class ClientStructureFinder {
                                                      BlockPos origin, int searchChunkRadius) {
         int spacing = placement.spacing();
 
-        // Convert block coordinates to region (cell) coordinates.
-        // A "region" is a spacing×spacing chunk grid cell.
+        // Convert block coords → region (cell) coords.
+        // A "region" is a spacing×spacing chunk cell in the world grid.
         int originChunkX = origin.getX() >> 4;
         int originChunkZ = origin.getZ() >> 4;
         int originRegX = Math.floorDiv(originChunkX, spacing);
@@ -169,22 +193,21 @@ public final class ClientStructureFinder {
         int searchRegRadius = (searchChunkRadius / spacing) + 2;
 
         BlockPos nearest = null;
-        long nearestDistSq = Long.MAX_VALUE;
+        double nearestDistSq = Double.MAX_VALUE;
 
         for (int dx = -searchRegRadius; dx <= searchRegRadius; dx++) {
             for (int dz = -searchRegRadius; dz <= searchRegRadius; dz++) {
                 int regX = originRegX + dx;
                 int regZ = originRegZ + dz;
 
-                // getPotentialStructureChunk replicates the vanilla placement RNG logic.
-                // It is a public method on RandomSpreadStructurePlacement since MC 1.19.
+                // getPotentialStructureChunk is a public method on
+                // RandomSpreadStructurePlacement (present since MC 1.19).
                 ChunkPos chunk = placement.getPotentialStructureChunk(storedSeed, regX, regZ);
 
-                // Use the centre of the chunk as our candidate block position.
-                // Y=64 is a placeholder — the actual structure Y varies; the goal
-                // processor will handle exact height once the bot arrives.
+                // Centre of the chunk as a candidate block position.
+                // Y=64 is a placeholder; the goal processor handles exact height.
                 BlockPos pos = new BlockPos((chunk.x() << 4) + 8, 64, (chunk.z() << 4) + 8);
-                long distSq = origin.distSqr(pos);
+                double distSq = origin.distSqr(pos);
                 if (distSq < nearestDistSq) {
                     nearestDistSq = distSq;
                     nearest = pos;
@@ -209,7 +232,8 @@ public final class ClientStructureFinder {
         try {
             File f = seedFile();
             if (f.exists()) {
-                String content = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8).trim();
+                String content = new String(
+                    Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8).trim();
                 storedSeed = Long.parseLong(content);
             }
         } catch (Exception ignored) {}
