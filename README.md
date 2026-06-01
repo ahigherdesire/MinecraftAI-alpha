@@ -18,6 +18,8 @@ Type commands in chat with the `#` prefix:
 #goto 1000 500          → walk to x=1000 z=500
 #mine diamond_ore       → mine diamonds (and deepslate_diamond_ore automatically)
 #elytra                 → fly to a destination with elytra — now works in any dimension
+#where                  → print your current X Y Z and dimension
+#where stronghold       → show where the nearest stronghold is (coords + direction), no navigation
 #structure stronghold   → find and fly/walk to the nearest stronghold
 #stop                   → stop everything
 #help                   → list all commands with descriptions and tab completion

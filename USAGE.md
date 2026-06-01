@@ -67,6 +67,27 @@ Key settings:
 
 ---
 
+## Where
+
+```
+#where
+#where stronghold
+#where village
+```
+
+`#where` with no argument prints your current coordinates and dimension — a quick position check.
+
+`#where <structure>` locates the nearest matching structure and tells you its coordinates, exact distance, and compass direction **without starting navigation**. Use `#structure <name>` when you want to both locate and travel there.
+
+Example output:
+```
+stronghold:  X=847  Z=-342  |  NE ↗  |  ~250 blocks  |  (use #structure stronghold to go there)
+```
+
+Accepts the same structure names and aliases as `#structure`.
+
+---
+
 ## Structure finder (singleplayer only)
 
 ```
@@ -158,6 +179,8 @@ Continuously paths toward the nearest unexplored chunk from an origin. Useful fo
 | `#render` | Fix glitched chunk rendering |
 | `#reloadall` / `#saveall` | Reload or save the disk chunk cache |
 | `#find <block>` | Search the disk cache for a block type |
+| `#where` | Print your current X Y Z and dimension |
+| `#where <structure>` | Show structure location and direction without navigating |
 | `#proc` | Show what process is currently active and its state |
 | `#eta` | Show estimated time to next segment and goal |
 | `#version` | Show the loaded Baritone version |

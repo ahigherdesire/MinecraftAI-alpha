@@ -30,6 +30,7 @@ common/logs/
 .settings/
 baritone_Client.launch
 #claude files
+CLAUDE.md
 CLAUDE.local.md
 .claude/
 # Copyright Files

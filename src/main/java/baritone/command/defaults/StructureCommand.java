@@ -103,58 +103,90 @@ public class StructureCommand extends Command {
         // Resolve alias (or pass through as-is for raw tag paths)
         String tagPath = ALIASES.getOrDefault(input, input);
 
-        // Must be in singleplayer — the integrated server has full world-gen access
-        MinecraftServer server = Minecraft.getInstance().getSingleplayerServer();
-        if (server == null) {
-            throw new CommandInvalidStateException(
-                "Structure finding requires singleplayer (integrated server).\n" +
-                "In multiplayer, use a seed calculator and then: #goto X ~ Z"
-            );
-        }
-
-        ServerLevel serverLevel = server.getLevel(ctx.world().dimension());
-        if (serverLevel == null) {
-            throw new CommandInvalidStateException(
-                "Current dimension is not available on the integrated server."
-            );
-        }
-
         TagKey<Structure> tag = TagKey.create(
             Registries.STRUCTURE,
             Identifier.withDefaultNamespace(tagPath)
         );
 
-        logDirect("Searching for nearest '" + tagPath + "' — this may take a moment...");
-
-        // Run the (potentially slow) structure search off the main thread, then
-        // schedule the result back on the main thread so Baritone can act on it.
         final BlockPos searchOrigin = ctx.playerFeet();
-        Thread searchThread = new Thread(() -> {
-            BlockPos found;
+
+        // Singleplayer: delegate to the integrated server (accurate, covers unexplored areas).
+        MinecraftServer server = Minecraft.getInstance().getSingleplayerServer();
+        if (server != null) {
+            ServerLevel serverLevel = server.getLevel(ctx.world().dimension());
+            if (serverLevel == null) {
+                throw new CommandInvalidStateException(
+                    "Current dimension is not available on the integrated server."
+                );
+            }
+            logDirect("Searching for nearest '" + tagPath + "' — this may take a moment...");
+            Thread searchThread = new Thread(() -> {
+                BlockPos found;
+                try {
+                    found = serverLevel.findNearestMapStructure(tag, searchOrigin, 100, false);
+                } catch (Exception e) {
+                    Minecraft.getInstance().execute(() ->
+                        logDirect("Structure search failed: " + e.getMessage()));
+                    return;
+                }
+                final BlockPos result = found;
+                Minecraft.getInstance().execute(() -> {
+                    if (result == null) {
+                        logDirect("No '" + tagPath + "' found within ~1600 blocks. Try exploring further.");
+                        return;
+                    }
+                    int dist = (int) Math.sqrt(searchOrigin.distSqr(result));
+                    logDirect("Found '" + tagPath + "' at " +
+                        result.getX() + ", " + result.getY() + ", " + result.getZ() +
+                        "  (~" + dist + " blocks away)");
+                    baritone.getCustomGoalProcess().setGoalAndPath(new GoalBlock(result));
+                });
+            }, "BaritoneStructureSearch");
+            searchThread.setDaemon(true);
+            searchThread.start();
+            return;
+        }
+
+        // Multiplayer: use client-side seed-based placement math.
+        if (tagPath.equals("strongholds")) {
+            logDirect("Strongholds use biome-based ring placement which cannot be");
+            logDirect("calculated client-side. Use  chunkbase.com  with seed " +
+                (ClientStructureFinder.hasSeed() ? ClientStructureFinder.getSeed() : "<enter with #seedinput>") +
+                "  to find the nearest stronghold, then:  #goto X ~ Z");
+            return;
+        }
+        if (!ClientStructureFinder.hasSeed()) {
+            throw new CommandInvalidStateException(
+                "You are on multiplayer. Enter your world seed first:  #seedinput <seed>\n" +
+                "Then try  #structure " + input + "  again."
+            );
+        }
+        logDirect("Searching for nearest '" + tagPath + "' using stored seed " +
+            ClientStructureFinder.getSeed() + "...");
+        Thread seedThread = new Thread(() -> {
+            BlockPos result;
             try {
-                found = serverLevel.findNearestMapStructure(tag, searchOrigin, 100, false);
+                result = ClientStructureFinder.findNearest(tag, searchOrigin, 100);
             } catch (Exception e) {
                 Minecraft.getInstance().execute(() ->
-                    logDirect("Structure search failed: " + e.getMessage())
-                );
+                    logDirect("Structure search failed: " + e.getMessage()));
                 return;
             }
-
-            final BlockPos result = found;
             Minecraft.getInstance().execute(() -> {
                 if (result == null) {
-                    logDirect("No '" + tagPath + "' found within ~1600 blocks. Try exploring further.");
+                    logDirect("No '" + tagPath + "' found within ~1600 blocks.");
+                    logDirect("Try exploring further, or check chunkbase.com for exact coordinates.");
                     return;
                 }
                 int dist = (int) Math.sqrt(searchOrigin.distSqr(result));
-                logDirect("Found '" + tagPath + "' at " +
-                    result.getX() + ", " + result.getY() + ", " + result.getZ() +
-                    "  (~" + dist + " blocks away)");
+                logDirect("Found '" + tagPath + "' at approx " +
+                    result.getX() + ", ?, " + result.getZ() +
+                    "  (~" + dist + " blocks — seed-based estimate)");
                 baritone.getCustomGoalProcess().setGoalAndPath(new GoalBlock(result));
             });
-        }, "BaritoneStructureSearch");
-        searchThread.setDaemon(true);
-        searchThread.start();
+        }, "BaritoneStructureSeedSearch");
+        seedThread.setDaemon(true);
+        seedThread.start();
     }
 
     @Override
@@ -180,9 +212,9 @@ public class StructureCommand extends Command {
         return Arrays.asList(
             "The structure command locates the nearest named structure and tells Baritone to navigate there.",
             "",
-            "Only works in singleplayer — the integrated server's structure locator is used, which",
-            "searches the world generator even for unexplored areas.  In multiplayer, use an",
-            "external seed calculator and then run:  #goto X ~ Z",
+            "Singleplayer: uses the integrated server's structure locator — searches even unexplored areas.",
+            "Multiplayer: uses seed-based placement math. Enter the world seed first with  #seedinput <seed>.",
+            "  Strongholds are NOT supported on multiplayer (biome-gated ring placement) — use chunkbase.com.",
             "",
             "Short aliases are accepted for all common structure types.",
             "",
