@@ -1,51 +1,55 @@
-# Pathing features
-- **Long distance pathing and splicing** Baritone calculates paths in segments, and precalculates the next segment when the current one is about to end, so that it's moving towards the goal at all times.
-- **Chunk caching** Baritone simplifies chunks to a compacted internal 2-bit representation (AIR, SOLID, WATER, AVOID) and stores them in RAM for better very-long-distance pathing. There is also an option to save these cached chunks to disk. <a href="https://www.youtube.com/watch?v=dyfYKSubhdc">Example</a>
-- **Block breaking** Baritone considers breaking blocks as part of its path. It also takes into account your current tool set and hot bar. For example, if you have a Eff V diamond pick, it may choose to mine through a stone barrier, while if you only had a wood pick it might be faster to climb over it.
-- **Block placing** Baritone considers placing blocks as part of its path. This includes sneak-back-placing, pillaring, etc. It has a configurable penalty of placing a block (set to 1 second by default), to conserve its resources. The list of acceptable throwaway blocks is also configurable, and is cobble, dirt, or netherrack by default. <a href="https://www.youtube.com/watch?v=F6FbI1L9UmU">Example</a>
-- **Falling** Baritone will fall up to 3 blocks onto solid ground (configurable, if you have Feather Falling and/or don't mind taking a little damage). If you have a water bucket on your hotbar, it will fall up to 23 blocks and place the bucket beneath it. It will fall an unlimited distance into existing still water.
-- **Vines and ladders** Baritone understands how to climb and descend vines and ladders. There is experimental support for more advanced maneuvers, like strafing to a different ladder / vine column in midair (off by default, setting named `allowVines`). Baritone can break its fall by grabbing ladders / vines midair, and understands when that is and isn't possible.
-- **Opening fence gates and doors**
+# Features
+
+## Pathfinding
+
+- **Long-distance spliced pathing** — calculates in segments, pre-calculates the next segment before the current one ends so movement is continuous.
+- **Chunk caching** — explored chunks are compressed to a 2-bit-per-block representation (AIR / SOLID / WATER / AVOID) and optionally saved to disk for faster long-distance routing.
+- **Block breaking** — considers tool set and hotbar when deciding whether to mine through obstacles. Diamond Eff V pick makes stone walls cheap; a wood pick makes climbing over them cheaper.
+- **Block placing** — sneak-back-placing, pillaring, bridging. Configurable penalty (default 1 second) to conserve resources.
+- **Falling** — up to 3 blocks onto solid ground (configurable). With a water bucket: up to 23 blocks. Unlimited into existing still water.
+- **Vines and ladders** — climbs, descends, and grabs mid-air to break falls. Optional strafe-to-adjacent-column support (`allowVines`).
+- **Doors and fence gates**
 - **Slabs and stairs**
-- **Falling blocks** Baritone understands the costs of breaking blocks with falling blocks on top, and includes all of their break costs. Additionally, since it avoids breaking any blocks touching a liquid, it won't break the bottom of a gravel stack below a lava lake (anymore).
-- **Avoiding dangerous blocks** Obviously, it knows not to walk through fire or on magma, not to corner over lava (that deals some damage), not to break any blocks touching a liquid (it might drown), etc.
-- **Parkour** Sprint jumping over 1, 2, or 3 block gaps
-- **Parkour place** Sprint jumping over a 3 block gap and placing the block to land on while executing the jump. It's really cool.
-- **Pigs** It can sort of control pigs. I wouldn't rely on it though.
+- **Falling-block awareness** — accounts for the cost of gravel/sand columns above a target block.
+- **Danger avoidance** — fire, magma, lava corners, blocks touching liquids.
+- **Parkour** — sprint-jumping over 1–3 block gaps; parkour-place (place the landing block mid-jump).
 
-# Pathing method
-Baritone uses A*, with some modifications: 
+## Mining
 
-- **Segmented calculation** Traditional A* calculates until the most promising node is in the goal, however in the environment of Minecraft with a limited render distance, we don't know the environment all the way to our goal. Baritone has three possible ways for path calculation to end: finding a path all the way to the goal, running out of time, or getting to the render distance. In the latter two scenarios, the selection of which segment to actually execute falls to the next item (incremental cost backoff). Whenever the path calculation thread finds that the best / most promising node is at the edge of loaded chunks, it increments a counter. If this happens more than 50 times (configurable), path calculation exits early. This happens with very low render distances. Otherwise, calculation continues until the timeout is hit (also configurable) or we find a path all the way to the goal.
-- **Incremental cost backoff** When path calculation exits early without getting all the way to the goal, Baritone it needs to select a segment to execute first (assuming it will calculate the next segment at the end of this one). It uses incremental cost backoff to select the best node by varying metrics, then paths to that node. This is unchanged from MineBot and I made a <a href="https://docs.google.com/document/d/1WVHHXKXFdCR1Oz__KtK8sFqyvSwJN_H4lftkHFgmzlc/edit">write-up</a> that still applies. In essence, it keeps track of the best node by various increasing coefficients, then picks the node with the least coefficient that goes at least 5 blocks from the starting position.
-- **Minimum improvement repropagation** The pathfinder ignores alternate routes that provide minimal improvements (less than 0.01 ticks of improvement), because the calculation cost of repropagating this to all connected nodes is much higher than the half-millisecond path time improvement it would get.
-- **Backtrack cost favoring** While calculating the next segment, Baritone favors backtracking its current segment. The cost is decreased heavily, but is still positive (this won't cause it to backtrack if it doesn't need to). This allows it to splice and jump onto the next segment as early as possible, if the next segment begins with a backtrack of the current one. <a href="https://www.youtube.com/watch?v=CGiMcb8-99Y">Example</a>
-- **Backtrack detection and pausing** While path calculation happens on a separate thread, the main game thread has access to the latest node considered, and the best path so far (those are rendered light blue and dark blue respectively). When the current best path (rendered dark blue) passes through the player's current position on the current path segment, path execution is paused (if it's safe to do so), because there's no point continuing forward if we're about to turn around and go back that same way. Note that the current best path as reported by the path calculation thread takes into account the incremental cost backoff system, so it's accurate to what the path calculation thread will actually pick once it finishes.
+- **Nearest-ore-first scanning** — chunk scanner runs in spiral order (nearest chunk first) so the 64 ore targets tracked at any time are always the closest available, not random distant cached ones.
+- **Always live-scans loaded chunks** — the disk cache no longer short-circuits the live scan. Both sources are merged and distance-sorted on every rescan.
+- **Automatic deepslate pairing** — specifying `iron_ore` automatically includes `deepslate_iron_ore` and vice versa, no need to list both.
+- **Dropped-item pickup** — after breaking ore, lingers briefly to pick up drops before moving to the next target.
+- **Legit mine mode** — optional setting that restricts mining to ores the player can actually see (no x-ray effect).
 
-# Chat control
+## Elytra flying
 
-- [Baritone chat control usage](USAGE.md)
+- **Any dimension** — works in the overworld, Nether, End, and custom dimensions.
+- **Full-height obstacle avoidance** — the voxel octree covers the complete world height for every dimension (overworld −64 to +320). Mountains, hills, and structures above sea level are correctly avoided.
+- **Correct Y-coordinate mapping** — blocks at any world height are stored at their true absolute Y in the pathfinder's octree, including below sea level (Y < 0 in the overworld).
+- **Live terrain updates** — block changes at any Y level are reflected immediately in the pathfinder, not just below Y=128.
+- **Auto takeoff** — finds a nearby ledge or cliff to jump from automatically (`elytraAutoJump`).
+- **Auto landing** — finds a safe landing spot when the path is complete, or emergency-lands on low durability/fireworks.
+- **Dimension-aware safe landing** — Nether lands on netherrack/gravel/basalt/blackstone; overworld/End accepts any solid non-hazardous block.
+- **Nether terrain prediction** — optionally uses the world seed to predict terrain in unloaded Nether chunks ahead of the flight path (`elytraPredictTerrain`).
 
-# Goals
-The pathing goal can be set to any of these options:
-- **GoalBlock** one specific block that the player should stand inside at foot level
-- **GoalXZ** an X and a Z coordinate, used for long distance pathing
-- **GoalYLevel** a Y coordinate
-- **GoalTwoBlocks** a block position that the player should stand in, either at foot or eye level
-- **GoalGetToBlock** a block position that the player should stand adjacent to, below, or on top of
-- **GoalNear** a block position that the player should get within a certain radius of, used for following entities
-- **GoalAxis** a block position on an axis or diagonal axis (so x=0, z=0, or x=z), and y=120 (configurable)
+## Structure finding
 
-And finally `GoalComposite`. `GoalComposite` is a list of other goals, any one of which satisfies the goal. For example, `mine diamond_ore` creates a `GoalComposite` of `GoalTwoBlocks`s for every diamond ore location it knows of.
+- **`#structure <name>`** — locates the nearest named structure and navigates to it. Uses the integrated server's world-gen data in singleplayer, so it works for unexplored areas too. Runs asynchronously so there's no tick stutter during the search.
+- Supports: `stronghold`, `village`, `nether_fortress`, `bastion`, `mansion`, `monument`, `ancient_city`, `end_city`, `mineshaft`, `buried_treasure`, `desert_pyramid`, `jungle_pyramid`, `pillager_outpost`, `shipwreck`, `igloo`, `swamp_hut`, `ocean_ruin`, `ruined_portal`, `trail_ruins`, and any raw structure tag name.
 
+## Other automation
 
-# Future features
-Things it doesn't have yet
-- Trapdoors
-- Sprint jumping in a 1x2 corridor
+- **Farming** — harvests, replants, and bone-meals crops automatically within a configurable radius.
+- **Builder** — builds Litematica / NBT schematics block by block.
+- **Explorer** — systematically explores the world from an origin point, always pathing toward the nearest unseen chunk.
+- **Follower** — follows a player or entity type, staying within a configurable radius.
+- **Backfill** — fills in mined tunnels behind the player.
+- **Waypoints** — named positions saved to disk. Auto-saves death and bed locations.
 
-See <a href="https://github.com/cabaletta/baritone/issues">issues</a> for more.
+## Pathfinding internals
 
-Things it may not ever have, from most likely to least likely =(
-- Boats
-- Horses (2x3 path instead of 1x2)
+- **A\* with segmented calculation** — exits early at the render distance edge or on timeout, selects best partial segment via incremental cost backoff.
+- **Minimum improvement repropagation** — skips repropagating alternate routes with < 0.01 tick improvement.
+- **Backtrack cost favoring** — reduces cost of backtracking the current segment so the path can splice onto the next segment sooner.
+- **Backtrack detection and pausing** — pauses execution when the best calculated path passes back through the player's current position, avoiding unnecessary forward movement.

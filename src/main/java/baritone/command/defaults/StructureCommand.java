@@ -56,7 +56,8 @@ public class StructureCommand extends Command {
 
     // Maps short player-facing names to Minecraft structure tag paths.
     // Tags use the plural form as registered in net.minecraft.tags.StructureTags.
-    private static final Map<String, String> ALIASES = new HashMap<>();
+    // Package-accessible so WhereCommand can share the same table without duplication.
+    static final Map<String, String> ALIASES = new HashMap<>();
     static {
         ALIASES.put("stronghold",        "strongholds");
         ALIASES.put("village",           "villages");
