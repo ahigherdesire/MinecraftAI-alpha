@@ -94,7 +94,8 @@ public final class NetherPathfinderContext {
             if (ptr == 0) return; // this shouldn't ever happen
             event.getBlocks().forEach(pair -> {
                 BlockPos pos = pair.first();
-                if (pos.getY() >= 128) return;
+                // No Y cutoff here — the original `>= 128` was Nether-only.
+                // Overworld blocks above Y=127 (e.g. mountain peaks) are now tracked.
                 boolean isSolid = pair.second() != AIR_BLOCK_STATE;
                 Octree.setBlock(ptr, pos.getX() & 15, pos.getY(), pos.getZ() & 15, isSolid);
             });
@@ -190,7 +191,19 @@ public final class NetherPathfinderContext {
     private static void writeChunkData(LevelChunk chunk, long ptr) {
         try {
             LevelChunkSection[] chunkInternalStorageArray = chunk.getSections();
-            for (int y0 = 0; y0 < 8; y0++) {
+            // The original code hardcoded y0 < 8 (= 128 blocks, the Nether height).
+            // That silently skipped every section above Y=63 in the overworld, so
+            // mountains and terrain above sea level were invisible to the pathfinder.
+            //
+            // Fix: iterate ALL sections and use the actual world-absolute Y coordinate
+            // so the octree is correct for any dimension height (overworld −64…320,
+            // Nether 0…128, custom dimensions, etc.).
+            //
+            // chunk.getMinSection() returns the section index of the chunk's bottom
+            // section (0 for Nether/End, −4 for overworld).  Multiplying by 16 gives
+            // the absolute Y of the first block in that section.
+            final int minSectionIndex = chunk.getMinSectionY();
+            for (int y0 = 0; y0 < chunkInternalStorageArray.length; y0++) {
                 final LevelChunkSection extendedblockstorage = chunkInternalStorageArray[y0];
                 if (extendedblockstorage == null) {
                     continue;
@@ -201,7 +214,6 @@ public final class NetherPathfinderContext {
                 if (iPalettedContainer.getPalette().maybeHas(state -> state.equals(AIR_BLOCK_STATE))) {
                     airId = iPalettedContainer.getPalette().idFor(AIR_BLOCK_STATE, PaletteResize.noResizeExpected());
                 }
-                // pasted from FasterWorldScanner
                 final BitStorage array = iPalettedContainer.getStorage();
                 if (array == null) continue;
                 final long[] longArray = array.getRaw();
@@ -209,7 +221,10 @@ public final class NetherPathfinderContext {
                 int bitsPerEntry = array.getBits();
                 long maxEntryValue = (1L << bitsPerEntry) - 1L;
 
-                final int yReal = y0 << 4;
+                // Absolute world Y of the bottom block in this section.
+                // For Nether  (minSection=0):  section 0 → yReal=0, section 7 → yReal=112
+                // For overworld (minSection=−4): section 0 → yReal=−64, section 8 → yReal=64
+                final int yReal = (minSectionIndex + y0) << 4;
                 for (int i = 0, idx = 0; i < longArray.length && idx < arraySize; ++i) {
                     long l = longArray[i];
                     for (int offset = 0; offset <= (64 - bitsPerEntry) && idx < arraySize; offset += bitsPerEntry, ++idx) {

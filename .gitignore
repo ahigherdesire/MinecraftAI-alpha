@@ -29,7 +29,9 @@ common/logs/
 .project
 .settings/
 baritone_Client.launch
-
+#claude files
+CLAUDE.local.md
+.claude/
 # Copyright Files
 !/.idea/copyright/Baritone.xml
 !/.idea/copyright/profiles_settings.xml

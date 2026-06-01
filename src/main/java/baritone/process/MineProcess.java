@@ -405,24 +405,21 @@ public final class MineProcess extends BaritoneProcessHelper implements IMinePro
 
         locs = prune(ctx, locs, filter, max, blacklist, dropped);
 
-        // Always run the live scanner unconditionally.
+        // Always run the live scanner unconditionally — even when the cache already has
+        // max results.  Cache entries come from old exploration and can be far away;
+        // skipping the live scan means nearby ores in freshly-loaded chunks are missed,
+        // causing Baritone to walk past close veins to reach distant cached ones.
         //
-        // The old guard (!untracked.isEmpty() || locs.size() < max) caused a critical
-        // bug: when the cache had >= max results from earlier exploration (which are
-        // typically far away), the live scan was skipped and nearby ores in currently-
-        // loaded-but-never-cached chunks were never found.  Baritone would then path
-        // to distant cached ores even when ore veins were right next to the player.
-        //
-        // By always scanning, all loaded chunks contribute candidates.  The final
-        // prune() call below sorts everything by distance and keeps only the closest
-        // `max` targets — so nearby ores always win over distant cached ones.
-        //
-        // Performance: scanChunkRadius pre-filters to loaded chunks only, so the cost
-        // is O(loaded_chunks × sections_per_chunk) — fast even at render distance 16.
+        // Budget: max * 4 (256 for the default max=64).  The scanner now uses a
+        // sequential stream in spiral/nearest-first chunk order, so limit(256) collects
+        // 256 positions from the nearest loaded chunks — not random ones.  prune() below
+        // merges everything (cache + live) and keeps only the 64 closest overall.
+        // 256 is enough headroom for prune() to always find the true 64 nearest without
+        // collecting thousands of positions for common ores like coal or iron.
         locs.addAll(BaritoneAPI.getProvider().getWorldScanner().scanChunkRadius(
                 ctx.getBaritone().getPlayerContext(),
                 filter,
-                -1,  // unlimited — collect ALL matches from loaded chunks
+                max * 4,  // bounded: nearest 256 positions from nearest loaded chunks
                 10,
                 32
         ));

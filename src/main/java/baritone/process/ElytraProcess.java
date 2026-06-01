@@ -220,7 +220,12 @@ public class ElytraProcess extends BaritoneProcessHelper implements IBaritonePro
                 return new PathingCommand(null, PathingCommandType.CANCEL_AND_SET_GOAL);
             }
             if (this.goal == null) {
-                this.goal = new GoalYLevel(31);
+                // In the Nether aim for Y=31 (safe mid-height inside the cave roof).
+                // In the overworld / End, aim for a spot well above the player so the
+                // path planner can find a cliff or overhang to jump off from.
+                boolean isNether = ctx.world() != null && ctx.world().dimension() == Level.NETHER;
+                int jumpY = isNether ? 31 : ctx.playerFeet().getY() + 20;
+                this.goal = new GoalYLevel(jumpY);
             }
             final IPathExecutor executor = baritone.getPathingBehavior().getCurrent();
             if (executor != null && executor.getPath().getGoal() == this.goal) {
@@ -328,7 +333,7 @@ public class ElytraProcess extends BaritoneProcessHelper implements IBaritonePro
     }
 
     private void pathTo0(BlockPos destination, boolean appendDestination) {
-        if (ctx.player() == null || ctx.player().level().dimension() != Level.NETHER) {
+        if (ctx.player() == null) {
             return;
         }
         this.onLostControl();
@@ -358,8 +363,12 @@ public class ElytraProcess extends BaritoneProcessHelper implements IBaritonePro
         } else {
             throw new IllegalArgumentException("The goal must be a GoalXZ or GoalBlock");
         }
-        if (y <= 0 || y >= 128) {
-            throw new IllegalArgumentException("The y of the goal is not between 0 and 128");
+        // Use the current world's actual height range so the check works in the
+        // overworld (−64 to 320), Nether (0–128), and any custom dimension.
+        final int minY = ctx.world() != null ? ctx.world().getMinY() : -64;
+        final int maxY = ctx.world() != null ? ctx.world().getMaxY() : 320;
+        if (y < minY || y >= maxY) {
+            throw new IllegalArgumentException("The y of the goal (" + y + ") is outside the world bounds [" + minY + ", " + maxY + ")");
         }
         this.pathTo(new BlockPos(x, y, z));
     }
@@ -450,7 +459,10 @@ public class ElytraProcess extends BaritoneProcessHelper implements IBaritonePro
 
         public WalkOffCalculationContext(IBaritone baritone) {
             super(baritone, true);
-            this.allowFallIntoLava = true;
+            // Only allow falling into lava when in the Nether — in the overworld
+            // there is no lava ocean and we should not route through lava to find a takeoff spot.
+            this.allowFallIntoLava = baritone.getPlayerContext().world() != null
+                    && baritone.getPlayerContext().world().dimension() == Level.NETHER;
             this.minFallHeight = 8;
             this.maxFallHeightNoWater = 10000;
         }
@@ -471,12 +483,32 @@ public class ElytraProcess extends BaritoneProcessHelper implements IBaritonePro
         }
     }
 
-    private static boolean isInBounds(BlockPos pos) {
-        return pos.getY() >= 0 && pos.getY() < 128;
+    private boolean isInBounds(BlockPos pos) {
+        int minY = ctx.world() != null ? ctx.world().getMinY() : -64;
+        int maxY = ctx.world() != null ? ctx.world().getMaxY() : 320;
+        return pos.getY() >= minY && pos.getY() < maxY;
     }
 
     private boolean isSafeBlock(Block block) {
-        return block == Blocks.NETHERRACK || block == Blocks.GRAVEL || (block == Blocks.NETHER_BRICKS && Baritone.settings().elytraAllowLandOnNetherFortress.value);
+        if (ctx.world() != null && ctx.world().dimension() == Level.NETHER) {
+            // Nether: only trust known solid surfaces (lava ocean is everywhere else)
+            return block == Blocks.NETHERRACK
+                || block == Blocks.GRAVEL
+                || block == Blocks.SOUL_SAND
+                || block == Blocks.SOUL_SOIL
+                || block == Blocks.BASALT
+                || block == Blocks.BLACKSTONE
+                || (block == Blocks.NETHER_BRICKS && Baritone.settings().elytraAllowLandOnNetherFortress.value);
+        }
+        // Overworld / End: any solid, non-hazardous block is safe to land on
+        if (block == Blocks.AIR || block == Blocks.CAVE_AIR || block == Blocks.VOID_AIR) return false;
+        if (block == Blocks.LAVA || block == Blocks.WATER) return false;
+        if (block == Blocks.CACTUS || block == Blocks.MAGMA_BLOCK) return false;
+        if (block == Blocks.CAMPFIRE || block == Blocks.SOUL_CAMPFIRE) return false;
+        if (block instanceof net.minecraft.world.level.block.LiquidBlock) return false;
+        if (block instanceof net.minecraft.world.level.block.FireBlock) return false;
+        // Accept anything else as a solid surface
+        return block.defaultBlockState().isSolid();
     }
 
     private boolean isSafeBlock(BlockPos pos) {
@@ -526,7 +558,8 @@ public class ElytraProcess extends BaritoneProcessHelper implements IBaritonePro
 
     private BetterBlockPos checkLandingSpot(BlockPos pos, LongOpenHashSet checkedSpots) {
         BlockPos.MutableBlockPos mut = new BlockPos.MutableBlockPos(pos.getX(), pos.getY(), pos.getZ());
-        while (mut.getY() >= 0) {
+        final int worldMinY = ctx.world() != null ? ctx.world().getMinY() : 0;
+        while (mut.getY() >= worldMinY) {
             if (checkedSpots.contains(mut.asLong())) {
                 return null;
             }

@@ -134,11 +134,15 @@ public enum FasterWorldScanner implements IWorldScanner {
     private List<BlockPos> scanChunksInternal(IPlayerContext ctx, BlockOptionalMetaLookup lookup, List<ChunkPos> chunkPositions, int maxBlocks) {
         assert ctx.world() != null;
         try {
-            // p -> scanChunkInternal(ctx, lookup, p)
-            Stream<BlockPos> posStream = chunkPositions.parallelStream().flatMap(p -> scanChunkInternal(ctx, lookup, p));
+            // Use a sequential stream so that chunkPositions (already in spiral/nearest-first
+            // order from getChunkRange) is processed nearest-chunk-first.  With a parallel
+            // stream, limit(N) fires as soon as any N elements are produced regardless of
+            // chunk order, meaning results could come from far-away chunks while nearby ones
+            // were still being processed.  Sequential guarantees that limit(N) retains blocks
+            // from the closest chunks.  The scan still runs on Baritone's background thread,
+            // so sequential vs parallel makes no difference to game-thread performance.
+            Stream<BlockPos> posStream = chunkPositions.stream().flatMap(p -> scanChunkInternal(ctx, lookup, p));
             if (maxBlocks >= 0) {
-                // WARNING: this can be expensive if maxBlocks is large...
-                // see limit's javadoc
                 posStream = posStream.limit(maxBlocks);
             }
             return posStream.collect(Collectors.toList());
