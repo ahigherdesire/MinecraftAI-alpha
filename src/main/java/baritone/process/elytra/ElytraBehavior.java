@@ -50,6 +50,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.AirBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.ChunkSource;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.AABB;
@@ -86,6 +87,17 @@ public final class ElytraBehavior implements Helper {
      * Remaining cool-down ticks between firework usage
      */
     private int remainingFireworkTicks;
+
+    // ── Wave-flight state ────────────────────────────────────────────────────
+    private enum WavePhase { CLIMB, DIVE }
+    /** Current phase of the wave-flight cycle when {@code elytraWaveMode} is active. */
+    private WavePhase wavePhase = WavePhase.CLIMB;
+
+    // ── Experimental-setting change detection ────────────────────────────────
+    /** Previous tick value of elytraWaveMode — used to detect the moment it is turned on. */
+    private boolean prevWaveMode = false;
+    /** Previous tick value of elytraConserveFireworks — used to detect the moment it is turned on. */
+    private boolean prevConserveFireworks = false;
 
     /**
      * Remaining cool-down ticks after the player's position and rotation are reset by the server
@@ -548,6 +560,23 @@ public final class ElytraBehavior implements Helper {
             this.minimumBoostTicks = 0;
         }
 
+        // ── Experimental setting warnings ────────────────────────────────────
+        // Warn the moment either setting is turned on (transition false → true).
+        final boolean curWaveMode = Baritone.settings().elytraWaveMode.value;
+        final boolean curConserve = Baritone.settings().elytraConserveFireworks.value;
+        if (curWaveMode && !prevWaveMode) {
+            logDirect("⚠ elytraWaveMode is EXPERIMENTAL. The bot may stall or take suboptimal paths, "
+                + "especially near terrain. Not recommended in the Nether (auto-disabled there). "
+                + "Disable with:  #set elytraWaveMode false");
+        }
+        if (curConserve && !prevConserveFireworks) {
+            logDirect("⚠ elytraConserveFireworks is EXPERIMENTAL. Skipping fireworks on descent may cause "
+                + "the bot to lose too much speed and fall. Not recommended in the Nether (auto-disabled there). "
+                + "Disable with:  #set elytraConserveFireworks false");
+        }
+        prevWaveMode = curWaveMode;
+        prevConserveFireworks = curConserve;
+
         // Reset rendered elements
         this.clearLines.clear();
         this.blockedLines.clear();
@@ -626,6 +655,14 @@ public final class ElytraBehavior implements Helper {
             this.aimPos = new BetterBlockPos(solution.goingTo.x, solution.goingTo.y, solution.goingTo.z);
         }
 
+        // Wave-flight phase update — must happen before tickUseFireworks
+        if (isWaveModeActive() && !this.pathManager.getPath().isEmpty()) {
+            this.updateWavePhase();
+        } else if (!isWaveModeActive()) {
+            // Reset to CLIMB so the bot starts correctly if wave mode is toggled or dimension changes
+            this.wavePhase = WavePhase.CLIMB;
+        }
+
         this.tickUseFireworks(
                 solution.context.start,
                 solution.goingTo,
@@ -653,7 +690,20 @@ public final class ElytraBehavior implements Helper {
         Solution solution = null;
 
         for (int relaxation = 0; relaxation < 3; relaxation++) { // try for a strict solution first, then relax more and more (if we're in a corner or near some blocks, it will have to relax its constraints a bit)
-            int[] heights = context.boost.isBoosted() ? new int[]{20, 10, 5, 0} : new int[]{0}; // attempt to gain height, if we can, so as not to waste the boost
+            // Heights to try: positive = aim above path (climb), 0 = aim at path, negative = aim below.
+            // During boost: always try to gain height to avoid wasting the boost.
+            // Wave-CLIMB: aim well above path to build altitude (firework will fire when speed drops).
+            // Wave-DIVE: aim at path nodes as-is; player is above path so this naturally creates a downward
+            //            pitch which converts altitude into forward speed — no firework needed.
+            final int[] heights;
+            if (context.boost.isBoosted()) {
+                heights = new int[]{20, 10, 5, 0};
+            } else if (isWaveModeActive() && wavePhase == WavePhase.CLIMB) {
+                final int climbH = Baritone.settings().elytraWaveClimbHeight.value;
+                heights = new int[]{climbH, (climbH * 2) / 3, climbH / 3, 5, 0};
+            } else {
+                heights = new int[]{0};
+            }
             int lookahead = relaxation == 0 ? 2 : 3; // ideally this would be expressed as a distance in blocks, rather than a number of voxel steps
             //int minStep = Math.max(0, playerNear - relaxation);
             int minStep = playerNear;
@@ -733,6 +783,56 @@ public final class ElytraBehavior implements Helper {
         return solution;
     }
 
+    /**
+     * Returns true if wave-flight mode should be active right now.
+     * Always false in the Nether — the ceiling (Y=128) and dense obstacle field make climbing
+     * dangerous, and the existing Nether path already handles terrain efficiently.
+     */
+    private boolean isWaveModeActive() {
+        return Baritone.settings().elytraWaveMode.value
+                && ctx.world() != null
+                && ctx.world().dimension() != Level.NETHER;
+    }
+
+    /**
+     * Updates the wave-flight phase (CLIMB / DIVE) based on the player's current altitude
+     * relative to the nearest path node.
+     *
+     * <p>CLIMB: player is aiming above the path to gain altitude — fireworks may be used.
+     * <p>DIVE:  player is above the path and aims at path nodes directly, creating a downward
+     *           pitch and converting altitude into horizontal speed for free. No fireworks used.
+     *
+     * <p>Transitions:
+     * <ul>
+     *   <li>CLIMB → DIVE: player reaches {@code elytraWaveClimbHeight * 0.75} blocks above path</li>
+     *   <li>DIVE → CLIMB: player drops back to within 4 blocks of path height</li>
+     * </ul>
+     */
+    private void updateWavePhase() {
+        final int near = this.pathManager.getNear();
+        final double pathY = this.pathManager.getPath().getVec(near).y;
+        final double playerY = ctx.player().position().y;
+        final int climbH = Baritone.settings().elytraWaveClimbHeight.value;
+
+        if (wavePhase == WavePhase.CLIMB) {
+            // Transition to DIVE once we've climbed 75 % of the target height
+            if (playerY >= pathY + climbH * 0.75) {
+                wavePhase = WavePhase.DIVE;
+                final Vec3 motion = ctx.player().getDeltaMovement();
+                final double hSpeed = Math.sqrt(motion.x * motion.x + motion.z * motion.z);
+                logVerbose(String.format("wave: DIVE  Y=%.0f  pathY=%.0f  hSpeed=%.2f", playerY, pathY, hSpeed));
+            }
+        } else { // DIVE
+            // Transition back to CLIMB once we've returned to near path altitude
+            if (playerY <= pathY + 4) {
+                wavePhase = WavePhase.CLIMB;
+                final Vec3 motion = ctx.player().getDeltaMovement();
+                final double hSpeed = Math.sqrt(motion.x * motion.x + motion.z * motion.z);
+                logVerbose(String.format("wave: CLIMB  Y=%.0f  pathY=%.0f  hSpeed=%.2f", playerY, pathY, hSpeed));
+            }
+        }
+    }
+
     private void tickUseFireworks(final Vec3 start, final Vec3 goingTo, final boolean isBoosted, final boolean forceUseFirework) {
         if (this.remainingSetBackTicks > 0) {
             logDebug("waiting for elytraFireworkSetbackUseDelay: " + this.remainingSetBackTicks);
@@ -741,7 +841,16 @@ public final class ElytraBehavior implements Helper {
         if (this.landingMode) {
             return;
         }
-        final boolean useOnDescend = !Baritone.settings().elytraConserveFireworks.value || ctx.player().position().y < goingTo.y + 5;
+        // Wave-flight: during the DIVE phase gravity provides free speed — save every firework
+        if (isWaveModeActive() && wavePhase == WavePhase.DIVE && !forceUseFirework) {
+            return;
+        }
+        // elytraConserveFireworks: skip fireworks while descending.
+        // Disabled automatically in the Nether — the tight ceiling and dense obstacles mean the bot
+        // must fire aggressively to avoid stalling into terrain.
+        final boolean inNether = ctx.world() != null && ctx.world().dimension() == Level.NETHER;
+        final boolean conserve = Baritone.settings().elytraConserveFireworks.value && !inNether;
+        final boolean useOnDescend = !conserve || ctx.player().position().y < goingTo.y + 5;
         final double currentSpeed = new Vec3(
                 ctx.player().getDeltaMovement().x,
                 // ignore y component if we are BOTH below where we want to be AND descending
