@@ -71,7 +71,8 @@ public final class DefaultCommands {
                 new ElytraCommand(baritone),
                 new StructureCommand(baritone),
                 new WhereCommand(baritone),
-                new SeedInputCommand(baritone)
+                new SeedInputCommand(baritone),
+                new NetherCommand(baritone)
         ));
         ExecutionControlCommands prc = new ExecutionControlCommands(baritone);
         commands.add(prc.pauseCommand);
