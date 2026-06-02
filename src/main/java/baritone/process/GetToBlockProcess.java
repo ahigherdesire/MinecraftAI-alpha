@@ -34,6 +34,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ShulkerBoxBlock;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.*;
@@ -243,14 +244,34 @@ public final class GetToBlockProcess extends BaritoneProcessHelper implements IG
         if (!Baritone.settings().rightClickContainerOnArrival.value) {
             return false;
         }
-        return block == Blocks.CRAFTING_TABLE || block == Blocks.FURNACE || block == Blocks.BLAST_FURNACE || block == Blocks.ENDER_CHEST || block == Blocks.CHEST || block == Blocks.TRAPPED_CHEST;
+        // Workstations
+        if (block == Blocks.CRAFTING_TABLE
+                || block == Blocks.FURNACE
+                || block == Blocks.BLAST_FURNACE
+                || block == Blocks.SMOKER) {
+            return true;
+        }
+        // Storage containers (chest-like, barrel, shulker boxes)
+        if (block == Blocks.CHEST
+                || block == Blocks.TRAPPED_CHEST
+                || block == Blocks.ENDER_CHEST
+                || block == Blocks.BARREL
+                || block instanceof ShulkerBoxBlock) {
+            return true;
+        }
+        return false;
     }
 
     private boolean blockOnTopMustBeRemoved(Block block) {
         if (!rightClickOnArrival(block)) { // only if we plan to actually open it on arrival
             return false;
         }
-        // only these chests; you can open a crafting table or furnace even with a block on top
-        return block == Blocks.ENDER_CHEST || block == Blocks.CHEST || block == Blocks.TRAPPED_CHEST;
+        // These containers have lids that need headroom to open.
+        // Workstations (furnace, crafting table, smoker) are fine with blocks on top.
+        return block == Blocks.CHEST
+                || block == Blocks.TRAPPED_CHEST
+                || block == Blocks.ENDER_CHEST
+                || block instanceof ShulkerBoxBlock;
+        // Note: BARREL opens like a door (no lid animation) — no clearance needed.
     }
 }
