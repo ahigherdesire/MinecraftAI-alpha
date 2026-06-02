@@ -61,6 +61,9 @@ public class SleepCommand extends Command {
             Blocks.BROWN_BED, Blocks.GREEN_BED, Blocks.RED_BED, Blocks.BLACK_BED
     );
 
+    /** The currently active sleep thread, if any. Interrupted when #sleep is re-run or when cancelled. */
+    private Thread sleepThread;
+
     public SleepCommand(IBaritone baritone) {
         super(baritone, "sleep");
     }
@@ -77,6 +80,12 @@ public class SleepCommand extends Command {
             return;
         }
 
+        // Cancel any previous sleep thread before starting a new one
+        if (sleepThread != null && sleepThread.isAlive()) {
+            sleepThread.interrupt();
+            logDirect("Cancelled previous #sleep. Starting fresh.");
+        }
+
         // ── Find nearest bed across all 16 colours ──────────────────────────
         final BetterBlockPos origin = ctx.playerFeet();
         double nearestDistSq = Double.MAX_VALUE;
@@ -85,7 +94,7 @@ public class SleepCommand extends Command {
         for (Block bed : ALL_BEDS) {
             final String blockName = BuiltInRegistries.BLOCK.getKey(bed).getPath();
             for (BetterBlockPos pos : ctx.worldData().getCachedWorld()
-                    .getLocationsOf(blockName, Integer.MAX_VALUE, origin.x, origin.y, 4)
+                    .getLocationsOf(blockName, Integer.MAX_VALUE, origin.x, origin.z, 4)
                     .stream()
                     .map(BetterBlockPos::new)
                     .toArray(BetterBlockPos[]::new)) {
@@ -114,11 +123,13 @@ public class SleepCommand extends Command {
                     + formatTicks(ticksUntilNight()) + " away).");
         }
 
+        logDirect("Use  #cancel  at any time to abort.");
+
         // Navigate to within 1 block of the bed
         baritone.getCustomGoalProcess().setGoalAndPath(new GoalNear(bedPos, 1));
 
         // ── Background thread: wait for arrival → wait for night → sleep ────
-        Thread sleepThread = new Thread(() -> {
+        sleepThread = new Thread(() -> {
             try {
                 // Step 1: wait until near the bed (10-minute timeout)
                 waitUntil(() -> isNearBed(bedPos), 1200, 500);

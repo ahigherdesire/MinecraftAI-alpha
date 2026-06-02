@@ -46,25 +46,49 @@ public class PortalCommand extends Command {
 
     @Override
     public void execute(String label, IArgConsumer args) throws CommandException {
-        args.requireMax(0);
+        args.requireMax(1);
         if (ctx.world() == null) {
             throw new CommandInvalidStateException("No world loaded.");
+        }
+
+        // #portal skip — blacklist the nearest portal and search for the next one
+        if (args.hasAny()) {
+            String sub = args.getString().toLowerCase();
+            if (sub.equals("skip")) {
+                boolean did = baritone.getGetToBlockProcess().blacklistClosest();
+                if (did) {
+                    logDirect("Blacklisted the nearest portal. Searching for the next closest one...");
+                    logDirect("If no other portal is known, the bot will explore to find one.");
+                } else {
+                    logDirect("Nothing to blacklist — not currently navigating to a portal.");
+                    logDirect("Run  #portal  first, then  #portal skip  to skip to the next one.");
+                }
+                return;
+            }
+            throw new CommandInvalidStateException(
+                "Unknown subcommand '" + sub + "'. Usage:  #portal  |  #portal skip");
         }
 
         boolean willEnter = Baritone.settings().enterPortal.value;
         if (willEnter) {
             logDirect("Navigating to the nearest nether portal and entering it.");
-            logDirect("(To just walk up to it without entering, set #set enterPortal false first)");
+            logDirect("(To stop at the portal without entering: #set enterPortal false)");
         } else {
-            logDirect("Navigating to the nearest nether portal.");
-            logDirect("(enterPortal is disabled — bot will stop next to the portal, not enter it)");
+            logDirect("Navigating to the nearest nether portal (enterPortal is off — will stop next to it).");
         }
+        logDirect("If the portal is unreachable, use  #portal skip  to blacklist it and try the next one.");
 
         baritone.getGetToBlockProcess().getToBlock(Blocks.NETHER_PORTAL);
     }
 
     @Override
     public Stream<String> tabComplete(String label, IArgConsumer args) {
+        if (args.hasExactlyOne()) {
+            String prefix = "";
+            try { prefix = args.peekString().toLowerCase(); } catch (Exception ignored) {}
+            final String p = prefix;
+            return Stream.of("skip").filter(s -> s.startsWith(p));
+        }
         return Stream.empty();
     }
 
@@ -86,9 +110,11 @@ public class PortalCommand extends Command {
             "To disable automatic entry:  #set enterPortal false",
             "",
             "Usage:",
-            "> whereportal    - go to the nearest nether portal",
+            "> portal          - go to the nearest nether portal",
+            "> portal skip     - blacklist the nearest portal and go to the next one",
+            "                    (useful when the closest portal is blocked or unreachable)",
             "",
-            "Aliases: #portal, #findportal",
+            "Aliases: #whereportal, #findportal",
             "",
             "Works in any dimension:",
             "  Overworld → finds an overworld portal (to go to the Nether)",
