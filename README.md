@@ -15,14 +15,17 @@ Drop this jar into your Minecraft `mods/` folder alongside Fabric Loader 0.18.4.
 Type commands in chat with the `#` prefix:
 
 ```
-#goto 1000 500          → walk to x=1000 z=500
-#mine diamond_ore       → mine diamonds (and deepslate_diamond_ore automatically)
-#elytra                 → fly to a destination with elytra — now works in any dimension
-#where                  → print your current X Y Z and dimension
-#where stronghold       → show where the nearest stronghold is (coords + direction), no navigation
-#structure stronghold   → find and fly/walk to the nearest stronghold
-#stop                   → stop everything
-#help                   → list all commands with descriptions and tab completion
+#goto 1000 500              → walk to x=1000 z=500
+#mine diamond_ore           → mine diamonds (deepslate variant included automatically)
+#elytra goto 5000 -2000     → fly to coordinates with elytra (any dimension)
+#whereportal                → navigate to the nearest nether portal (and enter it)
+#where                      → print your current X Y Z and dimension
+#where village              → show where the nearest village is (coords + direction)
+#structure stronghold       → find and walk to the nearest stronghold
+#nether                     → convert your current XYZ to the other dimension
+#seedinput <seed>           → store your world seed for multiplayer structure finding
+#stop                       → stop everything
+#help                       → list all commands with descriptions and tab completion
 ```
 
 ## What's new in this fork
@@ -33,35 +36,60 @@ The scanner now always checks currently-loaded chunks in spiral (nearest-first) 
 - Each `#mine` rescan collects up to 256 positions from nearest loaded chunks (sequential scan, limit fires closest-first) then merges with the cache and keeps the 64 closest overall.
 - `deepslate_*` ore variants are automatically included when you specify the stone variant and vice versa — `#mine iron_ore` covers both.
 
-### `#structure` command (singleplayer)
-Locates the nearest structure and paths to it using the integrated server's world-gen data — works even for unexplored areas. Aliases cover all common structures.
+### `#structure` — find any structure (singleplayer + multiplayer)
+Locates the nearest structure and paths to it. In singleplayer, uses the integrated server's world-gen data so it works even for unexplored chunks. In multiplayer, uses the world seed (enter with `#seedinput`) and grid math to calculate candidate positions client-side.
 
 ```
-#structure stronghold       → End portal room
-#structure village
-#structure nether_fortress  → also: fortress
-#structure bastion
-#structure ancient_city
-#structure mansion
-#structure monument
-#structure end_city
-#structure buried_treasure
-#structure desert_pyramid   → also: desert_temple
-#structure jungle_pyramid   → also: jungle_temple
-#structure pillager_outpost → also: outpost
-#structure shipwreck
-#structure mineshaft
+#structure village          #structure nether_fortress   #structure bastion
+#structure stronghold       #structure mansion           #structure monument
+#structure ancient_city     #structure end_city          #structure buried_treasure
+#structure desert_pyramid   #structure jungle_pyramid    #structure pillager_outpost
+#structure shipwreck        #structure mineshaft         #structure igloo
+#structure swamp_hut        #structure ruined_portal     #structure ocean_ruin
+#structure trial_chambers   #structure trail_ruins
 ```
 
-Tab-completes structure names. Runs the search off the game thread so there's no stutter. Multiplayer: use an external seed calculator and `#goto X ~ Z`.
+### `#where` — locate without navigating
+`#where <structure>` shows the nearest structure's coordinates, distance, and compass direction without starting navigation. Useful for scouting before committing to a path. `#where` alone prints your current X Y Z and dimension.
+
+### `#seedinput` — multiplayer structure finding
+Stores your world seed so `#structure` and `#where` work on multiplayer servers.
+
+```
+#seedinput 12345678       → save seed
+#seedinput                → show stored seed
+#seedinput clear          → forget seed
+```
+
+The seed is persisted to `baritone/seed.txt` and reloaded automatically on next launch.
+
+### `#nether` — coordinate converter
+Converts coordinates between the Overworld and the Nether (X and Z ÷8 / ×8; Y is the same in both).
+
+```
+#nether                       → convert your current X Y Z (auto-detects dimension)
+#nether 800 64 -400           → convert given coords (direction auto-detected)
+#nether overworld 800 64 -400 → explicitly convert overworld → nether
+#nether nether 100 64 -50     → explicitly convert nether → overworld
+```
+
+Aliases: `#nc`, `#coords`
+
+### `#whereportal` — go to the nearest portal
+Navigates to the nearest nether portal. Portal blocks are tracked in Baritone's cache, so any portal you've been near is found instantly. If `enterPortal` is enabled (the default), the bot walks straight into the portal and teleports through it.
+
+```
+#whereportal      → find and enter the nearest portal
+```
+
+Aliases: `#portal`, `#findportal`
 
 ### Elytra in the overworld (and any dimension)
-`#elytra` previously silently did nothing outside the Nether. It now works in the overworld, the End, and any custom dimension:
+`#elytra` previously did nothing outside the Nether. It now works in the overworld, the End, and any custom dimension:
 
-- Jump-off Y target is dimension-aware (Nether: Y=31 inside tunnel; overworld: current Y+20 to find a cliff)
-- Safe landing detection uses `block.defaultBlockState().isSolid()` for overworld blocks instead of only netherrack/gravel/nether bricks
-- The pathfinder's voxel octree now packs **all** chunk sections (overworld has 24 sections, −64 to +320) with correct absolute Y coordinates. Previously only the bottom 8 sections (Y 0–127) were packed, so mountains above sea level were invisible and the bot flew straight through them.
-- Block-update tracking no longer has a `y >= 128` cutoff, so terrain changes above sea level are reflected in real time.
+- The pathfinder's voxel octree now packs **all** chunk sections (overworld has 24 sections, −64 to +320) with correct absolute Y coordinates. Previously only the bottom 8 sections (Y 0–127) were packed, so mountains above sea level were invisible.
+- Block-update tracking no longer has a `y >= 128` cutoff.
+- New `goto` subcommand: `#elytra goto X Z` or `#elytra goto X Y Z`.
 
 ## Commands reference
 
@@ -75,12 +103,13 @@ Notable settings:
 - `legitMine` — only mine ores actually visible, no x-ray effect
 - `elytraAutoJump` — automatically find a ledge to jump from when starting elytra
 - `elytraPredictTerrain` — use world seed to predict unloaded terrain ahead (Nether)
+- `enterPortal` — walk into a portal when `#whereportal` arrives at it (default: true)
 - `mineMaxOreLocationsCount` — how many ore targets to track at once (default 64)
 - `renderCachedChunks` — visualise the disk cache in-game (GPU-heavy)
 
 ## Building from source
 
-See [SETUP.md](SETUP.md). The Gradle daemon has a known incompatibility with Java 25 on Windows; see [CLAUDE.md](CLAUDE.md) for the working manual `javac` + `jar uf` compilation workflow.
+See [SETUP.md](SETUP.md). Requires Java 25 JDK — if the build fails with `invalid source release: 25`, your JDK is too old.
 
 ## Credits
 

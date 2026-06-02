@@ -24,7 +24,8 @@
 
 ## Elytra flying
 
-- **Any dimension** — works in the overworld, Nether, End, and custom dimensions.
+- **Any dimension** — works in the overworld, Nether, End, and custom dimensions. No longer restricted to the Nether.
+- **`#elytra goto X Z` / `#elytra goto X Y Z`** — fly directly to coordinates without setting a goal first.
 - **Full-height obstacle avoidance** — the voxel octree covers the complete world height for every dimension (overworld −64 to +320). Mountains, hills, and structures above sea level are correctly avoided.
 - **Correct Y-coordinate mapping** — blocks at any world height are stored at their true absolute Y in the pathfinder's octree, including below sea level (Y < 0 in the overworld).
 - **Live terrain updates** — block changes at any Y level are reflected immediately in the pathfinder, not just below Y=128.
@@ -35,8 +36,36 @@
 
 ## Structure finding
 
-- **`#structure <name>`** — locates the nearest named structure and navigates to it. Uses the integrated server's world-gen data in singleplayer, so it works for unexplored areas too. Runs asynchronously so there's no tick stutter during the search.
-- Supports: `stronghold`, `village`, `nether_fortress`, `bastion`, `mansion`, `monument`, `ancient_city`, `end_city`, `mineshaft`, `buried_treasure`, `desert_pyramid`, `jungle_pyramid`, `pillager_outpost`, `shipwreck`, `igloo`, `swamp_hut`, `ocean_ruin`, `ruined_portal`, `trail_ruins`, and any raw structure tag name.
+- **`#structure <name>`** — locates the nearest named structure and navigates to it. Runs asynchronously so there's no tick stutter.
+  - **Singleplayer:** uses the integrated server's chunk generator — works for unexplored areas, no seed needed.
+  - **Multiplayer:** uses the world seed (entered via `#seedinput`) and RandomSpreadStructurePlacement grid math to calculate candidate positions client-side.
+- **`#where <structure>`** — same search, but only reports coordinates, distance, and compass direction — no navigation started. Useful for scouting.
+- **`#where`** (no argument) — prints current X Y Z and dimension name.
+- **Full structure list:** `stronghold`, `village`, `nether_fortress` / `fortress`, `bastion` / `bastion_remnant`, `mansion` / `woodland_mansion`, `monument` / `ocean_monument`, `ancient_city`, `end_city`, `buried_treasure`, `desert_pyramid` / `desert_temple`, `jungle_pyramid` / `jungle_temple`, `pillager_outpost` / `outpost`, `shipwreck`, `mineshaft` / `mine`, `igloo`, `swamp_hut` / `witch_hut`, `ruined_portal`, `ocean_ruin` / `ocean_ruins`, `trial_chambers` / `trial_chamber`, `trail_ruins`.
+- All searches run on a background thread and print results to chat when done.
+
+## Multiplayer seed-based features
+
+- **`#seedinput <seed>`** — stores the world seed to `baritone/seed.txt`, persisted across restarts. Required to use `#structure` and `#where` on multiplayer servers.
+- **`#seedinput`** (no arg) — shows the currently stored seed.
+- **`#seedinput clear`** — deletes the stored seed.
+- **Client-side structure math** — for RandomSpreadStructurePlacement structures (villages, fortresses, bastions, etc.) the mod calculates candidate chunk positions from the seed without any server involvement.
+- **Stronghold limitation** — strongholds use ConcentricRingsStructurePlacement which requires biome data unavailable client-side. On multiplayer, the command redirects you to chunkbase.com with your stored seed.
+
+## Coordinate utilities
+
+- **`#nether`** (no args) — converts your current X Y Z between dimensions based on which dimension you're in. X and Z are scaled ÷8 (overworld→nether) or ×8 (nether→overworld). Y is the same in both.
+- **`#nether X Y Z`** — convert given coordinates; direction is auto-detected from current dimension.
+- **`#nether X Z`** — same but without Y.
+- **`#nether overworld X Y Z`** / **`#nether nether X Y Z`** — explicit direction regardless of current dimension.
+- Aliases: `#nc`, `#coords`.
+
+## Portal navigation
+
+- **`#whereportal`** — navigates to the nearest nether portal in the current dimension. Portal blocks are tracked in Baritone's block cache, so any portal previously visited is found instantly. If none are cached, the bot explores to find one.
+- **Auto-entry** — if the `enterPortal` setting is enabled (default: true), the bot walks directly into the portal block and teleports through it.
+- Works in both directions: overworld portals (→ Nether) and nether portals (→ Overworld).
+- Aliases: `#portal`, `#findportal`.
 
 ## Other automation
 

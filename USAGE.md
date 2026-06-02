@@ -48,15 +48,25 @@ Type `#help` in-game for a searchable, clickable list of all commands.
 ```
 #elytra goto X Z
 #elytra goto X Y Z
-#elytra cancel
+#elytra
+#elytra reset
+#elytra repack
+#elytra supported
 ```
 
 Works in **any dimension** — overworld, Nether, End. Requires elytra equipped in chestplate slot and firework rockets in inventory.
 
+- `#elytra goto X Z` — fly to coordinates (bot handles height automatically)
+- `#elytra goto X Y Z` — fly to an exact block position
+- `#elytra` (no args) — fly to whatever goal was set with `#goal` beforehand
+- `#elytra reset` — reset pathfinding state (keeps flying to same goal, useful if stuck)
+- `#elytra repack` — reload all chunks into the pathfinder (use after terrain changes)
+- `#elytra supported` — check if the native pathfinding library loaded correctly
+
 Baritone will:
 1. Find a nearby ledge or cliff to jump from (auto-jump)
 2. Boost with fireworks to maintain altitude
-3. Navigate around terrain (mountains, cliffs, structures)
+3. Navigate around terrain at any height (mountains, structures — full overworld height coverage)
 4. Find a safe landing spot when close to the destination
 
 Key settings:
@@ -73,6 +83,7 @@ Key settings:
 #where
 #where stronghold
 #where village
+#where nether_fortress
 ```
 
 `#where` with no argument prints your current coordinates and dimension — a quick position check.
@@ -84,37 +95,116 @@ Example output:
 stronghold:  X=847  Z=-342  |  NE ↗  |  ~250 blocks  |  (use #structure stronghold to go there)
 ```
 
-Accepts the same structure names and aliases as `#structure`.
+Accepts all the same structure names and aliases as `#structure`.
+
+**Multiplayer:** requires a seed stored via `#seedinput`. Strongholds are not calculable client-side — you'll be pointed to chunkbase.com.
 
 ---
 
-## Structure finder (singleplayer only)
+## Structure finder
 
 ```
-#structure stronghold
 #structure village
-#structure nether_fortress
-#structure bastion
-#structure mansion
-#structure monument
+#structure stronghold
+#structure nether_fortress    (also: fortress)
+#structure bastion            (also: bastion_remnant)
+#structure mansion            (also: woodland_mansion)
+#structure monument           (also: ocean_monument)
 #structure ancient_city
 #structure end_city
 #structure buried_treasure
-#structure desert_pyramid
-#structure jungle_pyramid
-#structure pillager_outpost
+#structure desert_pyramid     (also: desert_temple)
+#structure jungle_pyramid     (also: jungle_temple)
+#structure pillager_outpost   (also: outpost)
 #structure shipwreck
-#structure mineshaft
+#structure mineshaft          (also: mine)
 #structure igloo
-#structure swamp_hut
+#structure swamp_hut          (also: witch_hut)
 #structure ruined_portal
-#structure ocean_ruin
+#structure ocean_ruin         (also: ocean_ruins)
+#structure trial_chambers     (also: trial_chamber)
 #structure trail_ruins
 ```
 
-Searches the world generator for the nearest matching structure (including unexplored chunks) and starts pathing to it. The search runs in the background so the game doesn't stutter.
+Searches for the nearest matching structure and starts pathing to it. The search runs in the background so the game doesn't stutter.
 
-For multiplayer: use an external seed calculator and `#goto X ~ Z`.
+**Singleplayer:** queries the integrated server's chunk generator — works even for unexplored areas, no seed needed.
+
+**Multiplayer:** uses seed-based structure math. Enter your world seed first:
+
+```
+#seedinput 12345678
+#structure village
+```
+
+**Strongholds on multiplayer:** strongholds can't be calculated client-side (they need biome data). The command will tell you to check chunkbase.com with your stored seed.
+
+---
+
+## Seed input (multiplayer)
+
+```
+#seedinput 12345678    → store a seed
+#seedinput             → show the currently stored seed
+#seedinput clear       → forget the stored seed
+```
+
+Also available as `#seed`.
+
+The seed is written to `baritone/seed.txt` in your Minecraft folder and reloaded automatically each launch — you only need to enter it once per world. Supports negative seeds (e.g. `#seedinput -4100785268875389365`).
+
+This seed is used by `#structure` and `#where` on multiplayer to calculate structure positions client-side without server access.
+
+---
+
+## Nether coordinate converter
+
+```
+#nether
+#nether X Y Z
+#nether X Z
+#nether overworld X Y Z
+#nether nether X Y Z
+```
+
+Converts coordinates between the Overworld and the Nether. X and Z are scaled ×8 or ÷8; Y is the same in both dimensions.
+
+- `#nether` — converts your current position (auto-detects which dimension you're in)
+- `#nether 800 64 -400` — converts the given X Y Z (direction auto-detected from your dimension)
+- `#nether X Z` — X and Z only, Y shown as `?`
+- `#nether overworld 800 64 -400` — explicitly convert overworld → nether regardless of dimension
+- `#nether nether 100 64 -50` — explicitly convert nether → overworld regardless of dimension
+
+Example output:
+```
+You are at (Overworld)  X=800  Y=64  Z=-400  →  Nether  X=100  Y=64  Z=-50
+```
+
+Aliases: `#nc`, `#coords`
+
+---
+
+## Portal navigation
+
+```
+#whereportal
+```
+
+Navigates to the nearest nether portal in your current dimension. Portal blocks are part of Baritone's block cache — any portal you've been near is found immediately. If no portal is in the cache, Baritone will explore to find one.
+
+By default (`enterPortal = true`), the bot walks directly **into** the portal and teleports through it.
+
+To navigate to the portal without entering it:
+```
+#set enterPortal false
+#whereportal
+```
+
+Works in both directions:
+- In the **overworld** → finds an overworld portal frame (to enter the Nether)
+- In the **nether** → finds a nether-side portal (to return to the Overworld)
+
+Aliases: `#portal`, `#findportal`
 
 ---
 
@@ -179,8 +269,6 @@ Continuously paths toward the nearest unexplored chunk from an origin. Useful fo
 | `#render` | Fix glitched chunk rendering |
 | `#reloadall` / `#saveall` | Reload or save the disk chunk cache |
 | `#find <block>` | Search the disk cache for a block type |
-| `#where` | Print your current X Y Z and dimension |
-| `#where <structure>` | Show structure location and direction without navigating |
 | `#proc` | Show what process is currently active and its state |
 | `#eta` | Show estimated time to next segment and goal |
 | `#version` | Show the loaded Baritone version |
@@ -210,6 +298,7 @@ Commonly changed settings:
 | `mineMaxOreLocationsCount` | 64 | How many ore targets to track |
 | `elytraAutoJump` | true | Auto-find a takeoff ledge |
 | `elytraPredictTerrain` | false | Predict unloaded Nether terrain |
+| `enterPortal` | true | Walk into portal when `#whereportal` arrives |
 | `backfill` | false | Fill mined tunnels behind you |
 | `renderCachedChunks` | false | Visualise the disk cache (GPU-heavy) |
 | `followRadius` | 3 | Distance to maintain when following |
@@ -226,4 +315,8 @@ Commonly changed settings:
 
 **Elytra command does nothing** — make sure you have an elytra equipped and firework rockets in your inventory. Also check you're not in spectator mode.
 
-**Structure command says "not in singleplayer"** — `#structure` requires access to the integrated server. On multiplayer, note the coordinates from a seed calculator and use `#goto X ~ Z`.
+**`#structure` says "not found" on multiplayer** — enter your world seed with `#seedinput <seed>` first. If you're looking for a stronghold specifically, use chunkbase.com — strongholds aren't calculable client-side.
+
+**`#whereportal` says no portal found** — the portal needs to be within a chunk you've previously loaded. Walk to the portal area first so it gets cached, then use the command.
+
+**`#nether` shows wrong direction** — use the explicit form: `#nether overworld X Y Z` or `#nether nether X Y Z` to force the conversion direction regardless of your current dimension.
