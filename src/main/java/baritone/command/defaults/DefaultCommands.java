@@ -73,7 +73,8 @@ public final class DefaultCommands {
                 new WhereCommand(baritone),
                 new SeedInputCommand(baritone),
                 new NetherCommand(baritone),
-                new PortalCommand(baritone)
+                new PortalCommand(baritone),
+                new SleepCommand(baritone)
         ));
         ExecutionControlCommands prc = new ExecutionControlCommands(baritone);
         commands.add(prc.pauseCommand);

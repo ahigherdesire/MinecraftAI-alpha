@@ -85,6 +85,7 @@ public class ElytraCommand extends Command {
         switch (action) {
             case "goto": {
                 // #elytra goto X Z   or   #elytra goto X Y Z
+                // Supports tilde notation: ~  ~10  ~-50  (relative to current position)
                 if (Baritone.settings().elytraTermsAccepted.value) {
                     if (detectOn2b2t()) warn2b2t();
                 } else {
@@ -92,32 +93,35 @@ public class ElytraCommand extends Command {
                 }
                 if (!args.hasAny()) {
                     throw new CommandInvalidStateException(
-                        "Usage:  #elytra goto X Z   or   #elytra goto X Y Z");
+                        "Usage:  #elytra goto X Z   or   #elytra goto X Y Z  (~ for relative)");
                 }
                 String s1 = args.getString();
                 if (!args.hasAny()) {
                     throw new CommandInvalidStateException(
-                        "Usage:  #elytra goto X Z   or   #elytra goto X Y Z");
+                        "Usage:  #elytra goto X Z   or   #elytra goto X Y Z  (~ for relative)");
                 }
                 String s2 = args.getString();
+                final net.minecraft.core.BlockPos feet = ctx.playerFeet();
                 Goal goal;
                 try {
-                    int x = Integer.parseInt(s1);
                     if (args.hasAny()) {
-                        // three numbers: X Y Z
-                        int y = Integer.parseInt(s2);
-                        int z = Integer.parseInt(args.getString());
+                        // Three tokens: X Y Z
+                        String s3 = args.getString();
+                        int x = parseRelativeCoord(s1, feet.getX());
+                        int y = parseRelativeCoord(s2, feet.getY());
+                        int z = parseRelativeCoord(s3, feet.getZ());
                         goal = new GoalBlock(x, y, z);
                         logDirect("Flying to  X=" + x + "  Y=" + y + "  Z=" + z);
                     } else {
-                        // two numbers: X Z
-                        int z = Integer.parseInt(s2);
+                        // Two tokens: X Z  (s2 is Z, use playerZ as its ~ origin)
+                        int x = parseRelativeCoord(s1, feet.getX());
+                        int z = parseRelativeCoord(s2, feet.getZ());
                         goal = new GoalXZ(x, z);
                         logDirect("Flying to  X=" + x + "  Z=" + z);
                     }
                 } catch (NumberFormatException e) {
                     throw new CommandInvalidStateException(
-                        "Invalid coordinates. Usage:  #elytra goto X Z   or   #elytra goto X Y Z");
+                        "Invalid coordinates '" + e.getMessage() + "'. Use integers or ~ notation.");
                 }
                 try {
                     elytra.pathTo(goal);
@@ -257,6 +261,18 @@ public class ElytraCommand extends Command {
                 "",
                 "Requires: elytra in chestplate slot + firework rockets in inventory."
         );
+    }
+
+    /**
+     * Parses a coordinate token that may be absolute ("100", "-50") or relative
+     * to {@code origin} using Minecraft-style tilde notation ("~", "~10", "~-50").
+     */
+    private static int parseRelativeCoord(String token, int origin) {
+        if (token.startsWith("~")) {
+            int offset = token.length() > 1 ? Integer.parseInt(token.substring(1)) : 0;
+            return origin + offset;
+        }
+        return Integer.parseInt(token);
     }
 
     private static String unsupportedSystemMessage() {

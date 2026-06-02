@@ -154,7 +154,9 @@ public class WhereCommand extends Command {
                         + ClientStructureFinder.getSeed() + " for exact coordinates.");
                     return;
                 }
-                int dist = (int) Math.sqrt(origin.distSqr(result));
+                int dx = result.getX() - origin.getX();
+                int dz = result.getZ() - origin.getZ();
+                int dist = (int) Math.sqrt(dx * dx + dz * dz);
                 String dir = compassDirection(origin, result);
                 logDirect(input + " (seed-based):"
                     + "  X=" + result.getX()

@@ -78,6 +78,7 @@ public class ElytraProcess extends BaritoneProcessHelper implements IBaritonePro
         this.landingSpot = null;
         this.reachedGoal = false;
         this.goal = null;
+        this.pendingGroundTarget = null;
         destroyBehaviorAsync();
     }
 
@@ -85,6 +86,12 @@ public class ElytraProcess extends BaritoneProcessHelper implements IBaritonePro
         super(baritone);
         baritone.getGameEventHandler().registerEventListener(this);
     }
+
+    /**
+     * When the elytra destination is underground, this holds the original target so ground
+     * pathfinding can take over after landing on the surface above it.
+     */
+    private BlockPos pendingGroundTarget;
 
     public static IElytraProcess create(final Baritone baritone) {
         return NetherPathfinderContext.isSupported()
@@ -203,7 +210,16 @@ public class ElytraProcess extends BaritoneProcessHelper implements IBaritonePro
             }
             logDirect("Done :)");
             baritone.getInputOverrideHandler().clearAllKeys();
-            this.onLostControl();
+            if (this.pendingGroundTarget != null) {
+                final BlockPos groundTarget = this.pendingGroundTarget;
+                this.pendingGroundTarget = null;
+                logDirect("Landed. Now mining down to target: X=" + groundTarget.getX()
+                        + " Y=" + groundTarget.getY() + " Z=" + groundTarget.getZ());
+                this.onLostControl();
+                baritone.getCustomGoalProcess().setGoalAndPath(new GoalBlock(groundTarget));
+            } else {
+                this.onLostControl();
+            }
             return new PathingCommand(null, PathingCommandType.REQUEST_PAUSE);
         }
 
@@ -336,7 +352,50 @@ public class ElytraProcess extends BaritoneProcessHelper implements IBaritonePro
         if (ctx.player() == null) {
             return;
         }
-        this.onLostControl();
+
+        // ── Destination safety check ─────────────────────────────────────────
+        // The native pathfinder (NetherPathfinder.pathFind) segfaults — killing the
+        // entire JVM — if the destination is inside a solid block. Detect this early
+        // and redirect: fly to the surface above the target, then mine down.
+        // IMPORTANT: pendingGroundTarget must be saved as a LOCAL variable here because
+        // onLostControl() (called below) clears the field. We restore it after that call.
+        BlockPos pendingGroundTargetToRestore = null;
+        if (ctx.world() != null) {
+            final int seaLevel   = ctx.world().getSeaLevel();
+            final int worldMaxY  = ctx.world().getMaxY();
+            boolean isSolid = false;
+            int surfaceY = destination.getY();
+
+            if (ctx.world().isLoaded(destination)) {
+                final BlockState state = ctx.world().getBlockState(destination);
+                if (state.blocksMotion()) {
+                    isSolid = true;
+                    // Scan upward until we find open air above the surface.
+                    BlockPos.MutableBlockPos mut = new BlockPos.MutableBlockPos(
+                            destination.getX(), destination.getY(), destination.getZ());
+                    while (mut.getY() < worldMaxY && ctx.world().getBlockState(mut).blocksMotion()) {
+                        mut.set(mut.getX(), mut.getY() + 1, mut.getZ());
+                    }
+                    surfaceY = mut.getY() + 3; // a few blocks clear of the surface
+                }
+            } else if (destination.getY() < seaLevel - 20) {
+                // Chunk not loaded but Y is suspiciously low — treat as underground.
+                isSolid = true;
+                surfaceY = Math.max(destination.getY() + 60, seaLevel + 30);
+            }
+
+            if (isSolid) {
+                logDirect("Destination Y=" + destination.getY() + " is underground. Flying to surface "
+                        + "(Y=" + surfaceY + ") then mining down to the target.");
+                // Save ground target BEFORE onLostControl() — that call clears the field.
+                // We restore it right after.
+                pendingGroundTargetToRestore = destination;
+                destination = new BlockPos(destination.getX(), surfaceY, destination.getZ());
+            }
+        }
+
+        this.onLostControl(); // clears pendingGroundTarget among other state
+        this.pendingGroundTarget = pendingGroundTargetToRestore; // restore after the clear
         this.predictingTerrain = Baritone.settings().elytraPredictTerrain.value;
         this.behavior = new ElytraBehavior(this.baritone, this, destination, appendDestination);
         if (ctx.world() != null) {
