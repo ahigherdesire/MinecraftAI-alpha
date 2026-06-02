@@ -1,14 +1,14 @@
-# MinecraftAI (Baritone fork — MC 26.1)
+# MinecraftAI (Baritone fork — MC 26.1.2)
 
-A Minecraft pathfinding bot forked from [Baritone](https://github.com/cabaletta/baritone), updated for **Minecraft 26.1** (Java 25, Fabric 0.18.4) with several new features.
+A Minecraft pathfinding bot forked from [Baritone](https://github.com/cabaletta/baritone), updated for **Minecraft 26.1.2** (Java 25, Fabric 0.18.4) with several new features.
 
 ## Download
 
-**Latest build:** `build/libs/baritone-1.0.0-mc26.1-dirty.jar`
+**Latest build:** `build/libs/baritone-1.0.0-mc26.1.2-dirty.jar`
 
 Drop this jar into your Minecraft `mods/` folder alongside Fabric Loader 0.18.4. No other mods required.
 
-> Minecraft 26.1 is fully unobfuscated so there is no remapping step — the jar contains plain class names.
+> Minecraft 26.1.2 is fully unobfuscated so there is no remapping step — the jar contains plain class names.
 
 ## Quick start
 
@@ -115,5 +115,5 @@ See [SETUP.md](SETUP.md). Requires Java 25 JDK — if the build fails with `inva
 
 **Original Baritone** — [leijurv](https://github.com/leijurv/) and [contributors](https://github.com/cabaletta/baritone/graphs/contributors)  
 **3D elytra pathfinding** — [babbaj](https://github.com/babbaj/) (nether-pathfinder native library)  
-**MC 26.1 port & new features** — this fork  
+**MC 26.1.2 port & new features** — this fork  
 **License** — LGPL 3.0

@@ -2,13 +2,13 @@
 
 ## Requirements
 
-- **Minecraft 26.1** with **Fabric Loader 0.18.4**
-- **Java 25 JDK** — required both to run MC 26.1 and to build from source
+- **Minecraft 26.1.2** with **Fabric Loader 0.18.4**
+- **Java 25 JDK** — required both to run MC 26.1.2 and to build from source
 
 ## Installing the mod
 
-1. Install [Fabric Loader 0.18.4](https://fabricmc.net/use/) for Minecraft 26.1.
-2. Copy `build/libs/baritone-1.0.0-mc26.1-dirty.jar` into your `mods/` folder.
+1. Install [Fabric Loader 0.18.4](https://fabricmc.net/use/) for Minecraft 26.1.2.
+2. Copy `build/libs/baritone-1.0.0-mc26.1.2-dirty.jar` into your `mods/` folder.
 3. Launch Minecraft. You should see `baritone/` created in your game directory.
 
 ## First-time setup (multiplayer)

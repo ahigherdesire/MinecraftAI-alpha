@@ -56,8 +56,8 @@ import java.util.stream.Stream;
  * RandomSpreadStructurePlacement grid math.
  *
  * <p>Each alias resolves to either {@code "tag:<tagPath>"} (a StructureTags entry that
- * exists in MC 26.1) or {@code "id:<structureId>"} (a direct structure registry ID for
- * structures that have no tag).  The tag names in MC 26.1 are singular, not plural.
+ * exists in MC 26.1.2) or {@code "id:<structureId>"} (a direct structure registry ID for
+ * structures that have no tag).  The tag names in MC 26.1.2 are singular, not plural.
  */
 public class StructureCommand extends Command {
 
@@ -69,7 +69,7 @@ public class StructureCommand extends Command {
      */
     static final Map<String, String> ALIASES = new HashMap<>();
     static {
-        // --- structures with a StructureTags entry in MC 26.1 (all singular) ---
+        // --- structures with a StructureTags entry in MC 26.1.2 (all singular) ---
         ALIASES.put("village",           "tag:village");
         ALIASES.put("mineshaft",         "tag:mineshaft");
         ALIASES.put("mine",              "tag:mineshaft");
@@ -92,7 +92,7 @@ public class StructureCommand extends Command {
         ALIASES.put("trial_chambers",    "tag:on_trial_chambers_maps");
         ALIASES.put("trial_chamber",     "tag:on_trial_chambers_maps");
 
-        // --- structures with no StructureTags entry in MC 26.1 (use direct ID) ---
+        // --- structures with no StructureTags entry in MC 26.1.2 (use direct ID) ---
         ALIASES.put("nether_fortress",   "id:fortress");
         ALIASES.put("fortress",          "id:fortress");
         ALIASES.put("bastion",           "id:bastion_remnant");

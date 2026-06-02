@@ -42,7 +42,7 @@ repositories {
     mavenCentral()
 }
 
-// MC 26.1 is unobfuscated, no mappings needed
+// MC 26.1.2 is unobfuscated, no mappings needed
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     implementation "net.fabricmc:fabric-loader:${project.fabric_loader_version}"
@@ -100,11 +100,11 @@ jar {
     }
 }
 
-// MC 26.1 is unobfuscated, no remapping needed
+// MC 26.1.2 is unobfuscated, no remapping needed
 
 tasks.withType(JavaCompile).configureEach {
     it.options.encoding = "UTF-8"
-    // Patch java.base for Minecraft 26.1 internals used at compile time
+    // Patch java.base for Minecraft 26.1.2 internals used at compile time
     it.options.fork = true
     it.options.forkOptions.jvmArgs += ['--patch-module=java.base=C:/T/patchout']
 }

@@ -34,19 +34,19 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "Baritone ${{ steps.version.outputs.VERSION }} for MC 26.1"
+          name: "Baritone ${{ steps.version.outputs.VERSION }} for MC 26.1.2"
           body: |
-            ## Baritone for Minecraft 26.1 (Fabric)
+            ## Baritone for Minecraft 26.1.2 (Fabric)
 
             ### Installation
-            1. Install Fabric Loader for MC 26.1
+            1. Install Fabric Loader for MC 26.1.2
             2. Place the jar into your `mods` folder
             3. Use `#help` in game chat for commands
 
             ### Changes
-            - Ported from MC 1.21.11 to MC 26.1
+            - Ported from MC 1.21.11 to MC 26.1.2
             - Updated build system to Fabric Loom 1.15 + Gradle 9.4.0
-            - Fixed all API changes for unobfuscated MC 26.1
+            - Fixed all API changes for unobfuscated MC 26.1.2
           files: build/libs/*.jar
           draft: false
           prerelease: false
