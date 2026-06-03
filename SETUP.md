@@ -24,17 +24,17 @@ The seed is saved to `baritone/seed.txt` and reloaded automatically on every fut
 
 ## First-run survival tips &nbsp;·&nbsp; 🧪 EXPERIMENTAL
 
-If you want the bot to keep you alive while you do other things, turn on Autopilot Survival:
+If you want the bot to walk you to a bed at night, turn on auto-sleep:
 
 ```
-#autopilot on
+#autosleep
 ```
 
-This enables `autoEat`, `autoFlee`, `autoSleep`, and `autoTorch` together. For autoEat and autoTorch to work, **keep food and torches in your hotbar** — the bot can't move items out of your main inventory yet (deferred due to a renamed MC 26.1.2 API).
+For it to work, walk near your bed at least once so Baritone caches it.
 
-For autoSleep to work, walk near your bed at least once so it gets cached.
+> ⚠️ `#autosleep` is **experimental** — it may misfire or interact poorly with other Baritone processes. Use `#cancel` if anything looks wrong, and `#autosleep off` to disable.
 
-> ⚠️ **All four autopilot features are experimental.** They may misfire, fail to fire, or fight other Baritone processes. Each one prints a one-time chat warning when enabled. Use `#cancel` if anything looks wrong, and `#autopilot off` to turn them all off.
+For auto-eat / auto-flee / auto-torch, use **Meteor Client** — Baritone's plans for those were dropped to avoid duplicating Meteor's work.
 
 ## Building from source
 

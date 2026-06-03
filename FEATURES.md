@@ -2,18 +2,12 @@
 
 ## 🛡️ Autopilot Survival &nbsp;·&nbsp; 🧪 EXPERIMENTAL
 
-> ⚠️ **Experimental.** These features may misfire, fail to fire, or interact poorly with other Baritone processes (especially `#mine`, `#elytra`, and `#farm`). Each command prints a one-time in-chat warning the moment it's enabled. Use `#cancel` if something misbehaves; toggle the feature off with the same command.
+> ⚠️ **Experimental.** `#autosleep` may misfire or interact poorly with other Baritone processes (`#mine`, `#elytra`, `#farm`). Prints a one-time in-chat warning when enabled. Toggle off with `#autosleep off`.
 
-Reactive watchers that keep you alive while idle or while another Baritone process is running. Each feature reacts to a single measurable threshold — no AI guesswork. All default off; opt in individually or with the master toggle.
+- **`#autosleep`** — at night or during a thunderstorm, navigates to the nearest cached bed (any of 16 colours). Won't interrupt an active process unless `autoSleepInterruptTasks = true`. Cache-only — walk near your bed once so Baritone learns its location.
+- **Death waypoints** — built-in Baritone feature (`doDeathWaypoints`, default `true`). Each death creates a clickable `death @ <timestamp>` waypoint — independently of this update.
 
-- **`#autoeat`** — watches `foodLevel`; eats the highest-saturation food from your hotbar when hunger drops below `autoEatThreshold` (default 14). Skips suspicious stew, rotten flesh, poisonous potato, pufferfish, and spider eye automatically. Skips golden apples unless `autoEatAllowGapples = true`.
-- **`#autoflee`** — watches `health`; on drop below `autoFleeThreshold` (default 6 HP) snapshots position and runs `GoalRunAway(autoFleeDistance, origin)`. Releases when health recovers above `autoFleeRecoverThreshold` (default 16 HP).
-- **`#autosleep`** — at night or during a thunderstorm, navigates to the nearest cached bed. Won't interrupt an active process unless `autoSleepInterruptTasks = true`.
-- **`#autotorch`** — places a torch from your hotbar when the block-light at your feet drops below `autoTorchLightLevel` (default 8). Disabled in Nether (lava risk) and End (pointless). Restricted to caves (sky-light < 4) by default to avoid littering surface bases.
-- **`#autopilot on / off / status`** — batch toggle for all four.
-- **Death waypoints** — built-in Baritone feature (`doDeathWaypoints`, default `true`). Each death creates a clickable `death @ <timestamp>` waypoint.
-
-**Limitation:** auto-eat and auto-torch act on hotbar items only. MC 26.1.2's `ClickType.SWAP` API moved, so cross-slot inventory swapping is deferred to a follow-up. Keep food and torches in your hotbar.
+**Dropped from this update:** the originally-planned `#autoeat`, `#autoflee`, `#autotorch`, and `#autopilot` master toggle were removed because **Meteor Client already provides equivalents** and duplicating them in Baritone wasn't worth the maintenance cost. The design spec for the dropped pieces remains in `UPCOMING.md` as a reference.
 
 ## Sleep and retreat
 

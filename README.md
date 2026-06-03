@@ -2,19 +2,15 @@
 
 A Minecraft pathfinding bot forked from [Baritone](https://github.com/cabaletta/baritone), updated for **Minecraft 26.1.2** (Java 25, Fabric 0.18.4) with several new features.
 
-> ## 🛡️ Major update shipped: **Autopilot Survival** &nbsp;·&nbsp; 🧪 EXPERIMENTAL
+> ## 🛡️ Autopilot Survival &nbsp;·&nbsp; 🧪 EXPERIMENTAL
 >
-> Baritone now **keeps you alive** while idle or running other commands.
+> - `#autosleep` — navigate to the nearest cached bed when night falls
 >
-> - `#autoeat` — auto-eat food from your hotbar when hunger drops
-> - `#autoflee` — run away when health drops below a threshold
-> - `#autosleep` — navigate to the nearest cached bed at night
-> - `#autotorch` — place torches in dark caves while walking
-> - `#autopilot on` — turn it all on with one command
+> ⚠️ **Experimental** — may misfire or interact poorly with other Baritone processes. Prints a one-time in-chat warning when enabled. Toggle off with `#autosleep off`.
 >
-> ⚠️ **These features are experimental.** They may misfire, fail to fire, or interact poorly with other Baritone processes. Each one prints a one-time in-chat warning the moment it's enabled. Use `#cancel` if anything misbehaves. Death-point waypointing (`doDeathWaypoints`, on by default) is the only piece that's *not* experimental — it's a built-in Baritone feature this update simply surfaces.
+> The originally-planned auto-eat / auto-flee / auto-torch / `#autopilot` master toggle have been **dropped** — Meteor Client already covers them. Death-point waypointing remains free via Baritone's built-in `doDeathWaypoints` (on by default).
 >
-> See [CHANGELOG.md](CHANGELOG.md) for full details.
+> See [CHANGELOG.md](CHANGELOG.md) for details.
 
 ## Download
 
@@ -46,33 +42,25 @@ Type commands in chat with the `#` prefix:
 
 **Stay alive while doing other things** (Autopilot Survival update):
 ```
-#autopilot on               → enable auto-eat, auto-flee, auto-sleep, auto-torch
-#autoeat                    → just the hunger watcher
-#autoflee                   → just the low-health flee watcher
 #autosleep                  → auto-navigate to a bed at night
-#autotorch                  → place torches in dark caves automatically
-#autopilot status           → show what's enabled
+#autosleep status           → show its settings
 ```
+(Auto-eat / auto-flee / auto-torch were dropped — Meteor Client already does them.)
 
 ## What's new in this fork
 
 ### 🛡️ Autopilot Survival 🧪 *experimental*
-Reactive watchers that keep you alive while idle or while running other commands. All four default off; opt in individually or batch. **Experimental — may misfire or interact unexpectedly with other Baritone processes; each prints a one-time warning when enabled.**
+A reactive watcher that walks you to the nearest cached bed when night falls (or during a thunderstorm). Toggle with `#autosleep`. Won't interrupt active tasks unless `autoSleepInterruptTasks=true`. Prints a one-time warning when enabled.
 
 ```
-#autoeat                → eat hotbar food when hunger < 14
-#autoflee               → flee 48 blocks when health < 6 HP
-#autosleep              → walk to the nearest cached bed at night
-#autotorch              → place torch when block light < 8 (caves only)
-#autopilot on           → all four at once
-#autopilot status       → see what's enabled and at what thresholds
+#autosleep              → toggle the bed-at-night watcher
+#autosleep interrupt    → toggle whether to interrupt active tasks
+#autosleep status       → show settings
 ```
 
-Each command also accepts a numeric argument to set its threshold and enable in one shot — e.g. `#autoeat 10`, `#autoflee 4`, `#autotorch 6`.
+Auto-eat / auto-flee / auto-torch / the `#autopilot` master toggle were **dropped** — Meteor Client already provides equivalents and there's no point duplicating them.
 
 Built-in Baritone death-waypointing (`doDeathWaypoints`, on by default) creates a clickable death-position waypoint on every death, so you can always run `#wp goto death @ <timestamp>` to come back for your stuff.
-
-**Hotbar limitation:** auto-eat and auto-torch operate on the hotbar only — `ClickType.SWAP` moved in MC 26.1.2 and cross-slot inventory swap is deferred. Keep food and torches in your hotbar.
 
 ### Ore detection overhaul
 The scanner now always checks currently-loaded chunks in spiral (nearest-first) order on top of the disk cache. Previously the cache short-circuited the live scan, causing Baritone to ignore nearby veins and walk to distant cached ore instead. Detection rate is dramatically higher and the closest ores are always targeted first.

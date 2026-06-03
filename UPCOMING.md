@@ -1,14 +1,25 @@
 # Major Update — Autopilot Survival
 
-> **Status:** ✅ Shipped. See [CHANGELOG.md](CHANGELOG.md) for the released feature set.
-> **Target:** Released on top of the MC 26.1.2 fork.
+> **Status:** ⚠️ **Partially shipped.** Only `#autosleep` made it to release. The auto-eat / auto-flee / auto-torch / `#autopilot` master toggle were **dropped** because Meteor Client already provides equivalents and duplicating them in Baritone wasn't worth the maintenance cost.
+>
+> See [CHANGELOG.md](CHANGELOG.md) for what actually shipped.
 
-This document is preserved as the original design spec. Some details in the implementation differ from the original plan:
-- Auto-eat / auto-torch act on hotbar items only (cross-slot swap deferred — `ClickType.SWAP` API moved in MC 26.1.2).
-- Death-waypointing turned out to be built into Baritone already (`doDeathWaypoints`); we surface it via `#autopilot status` instead of writing new code.
-- 5 phases collapsed into 1 — Phase 1 foundation + Phases 2–4 features shipped together since they're independent behaviors in the same class.
+**What survived from this plan:**
+- `#autosleep` / `#nightowl` — night-time bed autopilot
+- `SleepHelper` utility (bed search + night detection)
+- `AutopilotBehavior` skeleton (kept for future reactive watchers, but currently houses only the sleep tick)
+- One-time experimental warning convention
 
-What's below is the original plan.
+**What was dropped (and why):**
+- `#autoeat`, `#autoflee`, `#autotorch`, `#autopilot` — **Meteor Client already does these**
+- All `autoEat*`, `autoFlee*`, `autoTorch*` settings — removed from `Settings.java`
+- The four corresponding command classes — deleted from the repo
+- `ClickType.SWAP` workaround / inventory swap research — no longer relevant
+
+**What turned out to already exist in Baritone:**
+- Death-waypointing — `WaypointBehavior.onPlayerDeath()` + `doDeathWaypoints` setting (default `true`)
+
+The rest of this document is preserved as the original design spec for reference. Nothing below is a TODO.
 
 ---
 

@@ -8,21 +8,21 @@ All notable changes to this Baritone fork are documented here.
 
 ### 🛡️ Autopilot Survival update 🧪 *experimental*
 
-A coherent "keep me alive" package — bot now reacts to hunger, health, light level, and time of day. **All four features are marked experimental** — they print a one-time in-chat warning the moment they're enabled, matching the convention from `elytraWaveMode` / `elytraConserveFireworks`. May misfire or interact poorly with active processes (`#mine`, `#elytra`, `#farm`). All default off and opt-in.
+Originally planned with four reactive watchers (auto-eat / auto-flee / auto-sleep / auto-torch) plus an `#autopilot` master toggle. **Three of the four were dropped** because **Meteor Client already provides equivalents** — duplicating them in Baritone wasn't worth the maintenance cost. Only auto-sleep remains, since it's tightly coupled to Baritone's bed cache and the existing `#sleep` command.
 
 | Command | Aliases | Description |
 |---|---|---|
-| `#autoeat [n]` | `#eat` | Auto-eats food from hotbar when hunger < threshold (default 14). Numeric arg sets threshold. Skips suspicious stew, rotten flesh, poisonous potato, pufferfish, spider eye; skips golden apples unless `autoEatAllowGapples=true`. |
-| `#autoflee [hp]` | `#paranoia` | Snapshots position and runs `GoalRunAway(distance, origin)` when health drops below `autoFleeThreshold` (default 6 HP). Releases when health recovers above `autoFleeRecoverThreshold` (default 16). |
-| `#autosleep` | `#nightowl` | At night (or thunderstorm), navigates to the nearest cached bed. Won't interrupt active tasks unless `autoSleepInterruptTasks=true`. |
-| `#autotorch [light]` | `#torch` | Places a torch on the floor when block light < threshold (default 8). Disabled in Nether/End. Defaults to caves-only (sky-light < 4); toggle surface mode via `autotorch surface`. |
-| `#autopilot on/off/status` | `#survive` | Master toggle — flips all four features at once. Doesn't override individual settings. |
+| `#autosleep` | `#nightowl` | At night (or thunderstorm), navigates to the nearest cached bed. Won't interrupt active tasks unless `autoSleepInterruptTasks=true`. Prints a one-time experimental warning on enable. |
 
-**Death waypointing** is already provided by Baritone's built-in `WaypointBehavior` (setting `doDeathWaypoints`, default `true`). The `#autopilot status` listing surfaces it for visibility.
+**Death waypointing** is already provided by Baritone's built-in `WaypointBehavior` (setting `doDeathWaypoints`, default `true`) — independent of this update.
 
-**Implementation:** new `AutopilotBehavior` (extends `Behavior`, registered in `Baritone.java`) ticks all four watchers per frame; new `SleepHelper` extracts bed-search + night-detection from `SleepCommand`. 12 new settings under `Settings.java` (search "Autopilot Survival" comment block).
+**Implementation:** new `AutopilotBehavior` (extends `Behavior`, registered in `Baritone.java`) — currently single-purpose (sleep only) but kept as a class for future reactive watchers. New `SleepHelper` extracts bed-search + night-detection from `SleepCommand`. 2 new settings under `Settings.java` (search "Autopilot Survival" comment block): `autoSleep`, `autoSleepInterruptTasks`.
 
-**Known limitation:** auto-eat and auto-torch only act on items already in the **hotbar** — MC 26.1.2's `ClickType.SWAP` API was renamed, so cross-slot swapping is left for a follow-up. Keep food and torches in your hotbar for the autopilot to use them.
+**Dropped from the plan (see UPCOMING.md for the original design spec):**
+- `#autoeat` / `autoEat*` settings — Meteor's hunger autopilot already covers this
+- `#autoflee` / `autoFlee*` settings — Meteor has a flee/auto-walk feature
+- `#autotorch` / `autoTorch*` settings — Meteor has auto-torch
+- `#autopilot` master toggle — no longer makes sense for a single setting
 
 ---
 
