@@ -1,7 +1,16 @@
-# Upcoming Major Update — Autopilot Survival
+# Major Update — Autopilot Survival
 
-> **Status:** Planned. Not yet implemented.
-> **Target:** Next major release on top of the current MC 26.1.2 fork.
+> **Status:** ✅ Shipped. See [CHANGELOG.md](CHANGELOG.md) for the released feature set.
+> **Target:** Released on top of the MC 26.1.2 fork.
+
+This document is preserved as the original design spec. Some details in the implementation differ from the original plan:
+- Auto-eat / auto-torch act on hotbar items only (cross-slot swap deferred — `ClickType.SWAP` API moved in MC 26.1.2).
+- Death-waypointing turned out to be built into Baritone already (`doDeathWaypoints`); we surface it via `#autopilot status` instead of writing new code.
+- 5 phases collapsed into 1 — Phase 1 foundation + Phases 2–4 features shipped together since they're independent behaviors in the same class.
+
+What's below is the original plan.
+
+---
 
 Baritone currently has excellent navigation, but it ignores the player's biology. Walk into the night with zero food, no armor swap-in, and if you die it forgets where your stuff is. This update makes Baritone **keep you alive** — passively, while idle or while running other commands.
 

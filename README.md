@@ -2,15 +2,23 @@
 
 A Minecraft pathfinding bot forked from [Baritone](https://github.com/cabaletta/baritone), updated for **Minecraft 26.1.2** (Java 25, Fabric 0.18.4) with several new features.
 
-> ## 🚧 Major update coming: **Autopilot Survival**
+> ## 🛡️ Major update shipped: **Autopilot Survival** &nbsp;·&nbsp; 🧪 EXPERIMENTAL
 >
-> The next release will make Baritone **keep you alive** while idle or running other commands — auto-eat when hungry, auto-flee at low health, auto-sleep at night, auto-place torches in dark caves, automatic death-point waypointing, and a single `#autopilot` master toggle.
+> Baritone now **keeps you alive** while idle or running other commands.
 >
-> Read the full plan in **[UPCOMING.md](UPCOMING.md)**.
+> - `#autoeat` — auto-eat food from your hotbar when hunger drops
+> - `#autoflee` — run away when health drops below a threshold
+> - `#autosleep` — navigate to the nearest cached bed at night
+> - `#autotorch` — place torches in dark caves while walking
+> - `#autopilot on` — turn it all on with one command
+>
+> ⚠️ **These features are experimental.** They may misfire, fail to fire, or interact poorly with other Baritone processes. Each one prints a one-time in-chat warning the moment it's enabled. Use `#cancel` if anything misbehaves. Death-point waypointing (`doDeathWaypoints`, on by default) is the only piece that's *not* experimental — it's a built-in Baritone feature this update simply surfaces.
+>
+> See [CHANGELOG.md](CHANGELOG.md) for full details.
 
 ## Download
 
-**Latest build:** `build/libs/baritone-1.0.0-mc26.1.2-dirty.jar`
+**Latest build:** `build/libs/baritone-1.0.0-mc26.1-dirty.jar` *(targets MC 26.1.2; the JAR filename uses the short minor)*
 
 Drop this jar into your Minecraft `mods/` folder alongside Fabric Loader 0.18.4. No other mods required.
 
@@ -30,11 +38,41 @@ Type commands in chat with the `#` prefix:
 #structure stronghold       → find and walk to the nearest stronghold
 #nether                     → convert your current XYZ to the other dimension
 #seedinput <seed>           → store your world seed for multiplayer structure finding
+#sleep                      → go to the nearest bed and sleep when night falls
+#runaway 50                 → flee 50 blocks away from the current position
 #stop                       → stop everything
 #help                       → list all commands with descriptions and tab completion
 ```
 
+**Stay alive while doing other things** (Autopilot Survival update):
+```
+#autopilot on               → enable auto-eat, auto-flee, auto-sleep, auto-torch
+#autoeat                    → just the hunger watcher
+#autoflee                   → just the low-health flee watcher
+#autosleep                  → auto-navigate to a bed at night
+#autotorch                  → place torches in dark caves automatically
+#autopilot status           → show what's enabled
+```
+
 ## What's new in this fork
+
+### 🛡️ Autopilot Survival 🧪 *experimental*
+Reactive watchers that keep you alive while idle or while running other commands. All four default off; opt in individually or batch. **Experimental — may misfire or interact unexpectedly with other Baritone processes; each prints a one-time warning when enabled.**
+
+```
+#autoeat                → eat hotbar food when hunger < 14
+#autoflee               → flee 48 blocks when health < 6 HP
+#autosleep              → walk to the nearest cached bed at night
+#autotorch              → place torch when block light < 8 (caves only)
+#autopilot on           → all four at once
+#autopilot status       → see what's enabled and at what thresholds
+```
+
+Each command also accepts a numeric argument to set its threshold and enable in one shot — e.g. `#autoeat 10`, `#autoflee 4`, `#autotorch 6`.
+
+Built-in Baritone death-waypointing (`doDeathWaypoints`, on by default) creates a clickable death-position waypoint on every death, so you can always run `#wp goto death @ <timestamp>` to come back for your stuff.
+
+**Hotbar limitation:** auto-eat and auto-torch operate on the hotbar only — `ClickType.SWAP` moved in MC 26.1.2 and cross-slot inventory swap is deferred. Keep food and torches in your hotbar.
 
 ### Ore detection overhaul
 The scanner now always checks currently-loaded chunks in spiral (nearest-first) order on top of the disk cache. Previously the cache short-circuited the live scan, causing Baritone to ignore nearby veins and walk to distant cached ore instead. Detection rate is dramatically higher and the closest ores are always targeted first.

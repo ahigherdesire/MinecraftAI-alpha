@@ -8,7 +8,8 @@
 ## Installing the mod
 
 1. Install [Fabric Loader 0.18.4](https://fabricmc.net/use/) for Minecraft 26.1.2.
-2. Copy `build/libs/baritone-1.0.0-mc26.1.2-dirty.jar` into your `mods/` folder.
+2. Copy `build/libs/baritone-1.0.0-mc26.1-dirty.jar` into your `mods/` folder.
+   (The JAR filename uses `mc26.1` — short minor — but it targets MC 26.1.2.)
 3. Launch Minecraft. You should see `baritone/` created in your game directory.
 
 ## First-time setup (multiplayer)
@@ -20,6 +21,20 @@ If you play on multiplayer and want to use `#structure` or `#where` to find stru
 ```
 
 The seed is saved to `baritone/seed.txt` and reloaded automatically on every future launch — you only need to do this once per world.
+
+## First-run survival tips &nbsp;·&nbsp; 🧪 EXPERIMENTAL
+
+If you want the bot to keep you alive while you do other things, turn on Autopilot Survival:
+
+```
+#autopilot on
+```
+
+This enables `autoEat`, `autoFlee`, `autoSleep`, and `autoTorch` together. For autoEat and autoTorch to work, **keep food and torches in your hotbar** — the bot can't move items out of your main inventory yet (deferred due to a renamed MC 26.1.2 API).
+
+For autoSleep to work, walk near your bed at least once so it gets cached.
+
+> ⚠️ **All four autopilot features are experimental.** They may misfire, fail to fire, or fight other Baritone processes. Each one prints a one-time chat warning when enabled. Use `#cancel` if anything looks wrong, and `#autopilot off` to turn them all off.
 
 ## Building from source
 

@@ -640,6 +640,42 @@ public final class Settings {
      */
     public final Setting<Boolean> doDeathWaypoints = new Setting<>(true);
 
+    // ════════════════════════════════════════════════════════════════════════
+    //  Autopilot Survival — see UPCOMING.md / CHANGELOG.md
+    //  All default off; opt-in. Toggle via #autoeat / #autoflee / #autosleep /
+    //  #autotorch / #autopilot or via #set <name> true.
+    // ════════════════════════════════════════════════════════════════════════
+
+    /** Master enable for the auto-eat watcher (eats when hunger drops). */
+    public final Setting<Boolean> autoEat = new Setting<>(false);
+    /** Hunger level (out of 20) below which auto-eat triggers. */
+    public final Setting<Integer> autoEatThreshold = new Setting<>(14);
+    /** When true, auto-eat may consume golden apples / enchanted golden apples. */
+    public final Setting<Boolean> autoEatAllowGapples = new Setting<>(false);
+
+    /** Master enable for the auto-flee watcher (runs away when health drops). */
+    public final Setting<Boolean> autoFlee = new Setting<>(false);
+    /** Health (out of 20) below which the bot starts fleeing. */
+    public final Setting<Double> autoFleeThreshold = new Setting<>(6.0);
+    /** Health above which the bot stops fleeing and releases control. */
+    public final Setting<Double> autoFleeRecoverThreshold = new Setting<>(16.0);
+    /** Distance in blocks for the GoalRunAway used by the auto-flee watcher. */
+    public final Setting<Integer> autoFleeDistance = new Setting<>(48);
+
+    /** Master enable for the auto-sleep watcher (sleeps when night/storm arrives). */
+    public final Setting<Boolean> autoSleep = new Setting<>(false);
+    /** When false, auto-sleep skips activation if another process is controlling pathing. */
+    public final Setting<Boolean> autoSleepInterruptTasks = new Setting<>(false);
+
+    /** Master enable for the auto-torch placer (drops a torch in dark areas). */
+    public final Setting<Boolean> autoTorch = new Setting<>(false);
+    /** Block light level below which auto-torch will place a torch. */
+    public final Setting<Integer> autoTorchLightLevel = new Setting<>(8);
+    /** Minimum ticks between consecutive auto-torch placements. */
+    public final Setting<Integer> autoTorchIntervalTicks = new Setting<>(100);
+    /** When true, auto-torch only places if sky-light < 4 (i.e. in caves / underground). */
+    public final Setting<Boolean> autoTorchOnlyInCaves = new Setting<>(true);
+
     /**
      * The big one. Download all chunks in simplified 2-bit format and save them for better very-long-distance pathing.
      */

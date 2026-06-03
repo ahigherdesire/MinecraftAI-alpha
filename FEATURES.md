@@ -1,5 +1,25 @@
 # Features
 
+## 🛡️ Autopilot Survival &nbsp;·&nbsp; 🧪 EXPERIMENTAL
+
+> ⚠️ **Experimental.** These features may misfire, fail to fire, or interact poorly with other Baritone processes (especially `#mine`, `#elytra`, and `#farm`). Each command prints a one-time in-chat warning the moment it's enabled. Use `#cancel` if something misbehaves; toggle the feature off with the same command.
+
+Reactive watchers that keep you alive while idle or while another Baritone process is running. Each feature reacts to a single measurable threshold — no AI guesswork. All default off; opt in individually or with the master toggle.
+
+- **`#autoeat`** — watches `foodLevel`; eats the highest-saturation food from your hotbar when hunger drops below `autoEatThreshold` (default 14). Skips suspicious stew, rotten flesh, poisonous potato, pufferfish, and spider eye automatically. Skips golden apples unless `autoEatAllowGapples = true`.
+- **`#autoflee`** — watches `health`; on drop below `autoFleeThreshold` (default 6 HP) snapshots position and runs `GoalRunAway(autoFleeDistance, origin)`. Releases when health recovers above `autoFleeRecoverThreshold` (default 16 HP).
+- **`#autosleep`** — at night or during a thunderstorm, navigates to the nearest cached bed. Won't interrupt an active process unless `autoSleepInterruptTasks = true`.
+- **`#autotorch`** — places a torch from your hotbar when the block-light at your feet drops below `autoTorchLightLevel` (default 8). Disabled in Nether (lava risk) and End (pointless). Restricted to caves (sky-light < 4) by default to avoid littering surface bases.
+- **`#autopilot on / off / status`** — batch toggle for all four.
+- **Death waypoints** — built-in Baritone feature (`doDeathWaypoints`, default `true`). Each death creates a clickable `death @ <timestamp>` waypoint.
+
+**Limitation:** auto-eat and auto-torch act on hotbar items only. MC 26.1.2's `ClickType.SWAP` API moved, so cross-slot inventory swapping is deferred to a follow-up. Keep food and torches in your hotbar.
+
+## Sleep and retreat
+
+- **`#sleep`** — explicit one-shot: finds the nearest cached bed (any of 16 colours), navigates with `GoalNear(bed, 1)`, then on a background thread waits for night and right-clicks to sleep. Cancel any time with `#cancel`.
+- **`#runaway <distance>`** — sets `GoalRunAway(distance, playerFeet)`. Origin is locked at the moment the command runs so the bot stops once far enough. Default distance 32. Aliases `#flee`, `#escape`.
+
 ## Pathfinding
 
 - **Long-distance spliced pathing** — calculates in segments, pre-calculates the next segment before the current one ends so movement is continuous.
@@ -25,7 +45,8 @@
 ## Elytra flying
 
 - **Any dimension** — works in the overworld, Nether, End, and custom dimensions. No longer restricted to the Nether.
-- **`#elytra goto X Z` / `#elytra goto X Y Z`** — fly directly to coordinates without setting a goal first.
+- **`#elytra goto X Z` / `#elytra goto X Y Z`** — fly directly to coordinates without setting a goal first. Supports tilde notation: `#elytra goto ~500 ~ ~-200` flies to a position relative to your current location.
+- **Crash-proof destination handling** — if the target Y is inside terrain (loaded chunk) or in an unloaded chunk where seed-predicted terrain might be solid, the bot lifts to a safe altitude. Underground targets trigger an automatic land-and-mine-down handoff to `CustomGoalProcess`. (The native pathfinder segfaults the entire JVM on solid destinations — this guard was the original `#elytra goto 0 0 0` crash fix.)
 - **Full-height obstacle avoidance** — the voxel octree covers the complete world height for every dimension (overworld −64 to +320). Mountains, hills, and structures above sea level are correctly avoided.
 - **Correct Y-coordinate mapping** — blocks at any world height are stored at their true absolute Y in the pathfinder's octree, including below sea level (Y < 0 in the overworld).
 - **Live terrain updates** — block changes at any Y level are reflected immediately in the pathfinder, not just below Y=128.
@@ -64,8 +85,18 @@
 
 - **`#whereportal`** — navigates to the nearest nether portal in the current dimension. Portal blocks are tracked in Baritone's block cache, so any portal previously visited is found instantly. If none are cached, the bot explores to find one.
 - **Auto-entry** — if the `enterPortal` setting is enabled (default: true), the bot walks directly into the portal block and teleports through it.
+- **`#portal skip`** — blacklist the nearest portal and search for the next one. Useful when the closest portal is unreachable (trapped, lava-blocked, etc.).
 - Works in both directions: overworld portals (→ Nether) and nether portals (→ Overworld).
 - Aliases: `#portal`, `#findportal`.
+
+## Container interaction (expanded)
+
+`#goto <container_block>` will walk up to and (if `rightClickContainerOnArrival = true`) automatically open the container on arrival. Supported containers now include:
+
+- **Workstations:** crafting table, furnace, blast furnace, smoker.
+- **Storage:** chest, trapped chest, ender chest, barrel, all 17 shulker box variants (16 colours + undyed).
+
+Chests / ender chests / trapped chests / shulker boxes also require headroom — Baritone removes the block above when navigating to them. Barrels open like a door so they need no clearance.
 
 ## Other automation
 

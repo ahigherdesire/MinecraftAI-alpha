@@ -75,7 +75,12 @@ public final class DefaultCommands {
                 new NetherCommand(baritone),
                 new PortalCommand(baritone),
                 new SleepCommand(baritone),
-                new RunAwayCommand(baritone)
+                new RunAwayCommand(baritone),
+                new AutoEatCommand(baritone),
+                new AutoFleeCommand(baritone),
+                new AutoSleepCommand(baritone),
+                new AutoTorchCommand(baritone),
+                new AutopilotCommand(baritone)
         ));
         ExecutionControlCommands prc = new ExecutionControlCommands(baritone);
         commands.add(prc.pauseCommand);

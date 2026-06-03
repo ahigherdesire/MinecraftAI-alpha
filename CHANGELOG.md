@@ -6,6 +6,26 @@ All notable changes to this Baritone fork are documented here.
 
 ## [Unreleased] — MC 26.1.2
 
+### 🛡️ Autopilot Survival update 🧪 *experimental*
+
+A coherent "keep me alive" package — bot now reacts to hunger, health, light level, and time of day. **All four features are marked experimental** — they print a one-time in-chat warning the moment they're enabled, matching the convention from `elytraWaveMode` / `elytraConserveFireworks`. May misfire or interact poorly with active processes (`#mine`, `#elytra`, `#farm`). All default off and opt-in.
+
+| Command | Aliases | Description |
+|---|---|---|
+| `#autoeat [n]` | `#eat` | Auto-eats food from hotbar when hunger < threshold (default 14). Numeric arg sets threshold. Skips suspicious stew, rotten flesh, poisonous potato, pufferfish, spider eye; skips golden apples unless `autoEatAllowGapples=true`. |
+| `#autoflee [hp]` | `#paranoia` | Snapshots position and runs `GoalRunAway(distance, origin)` when health drops below `autoFleeThreshold` (default 6 HP). Releases when health recovers above `autoFleeRecoverThreshold` (default 16). |
+| `#autosleep` | `#nightowl` | At night (or thunderstorm), navigates to the nearest cached bed. Won't interrupt active tasks unless `autoSleepInterruptTasks=true`. |
+| `#autotorch [light]` | `#torch` | Places a torch on the floor when block light < threshold (default 8). Disabled in Nether/End. Defaults to caves-only (sky-light < 4); toggle surface mode via `autotorch surface`. |
+| `#autopilot on/off/status` | `#survive` | Master toggle — flips all four features at once. Doesn't override individual settings. |
+
+**Death waypointing** is already provided by Baritone's built-in `WaypointBehavior` (setting `doDeathWaypoints`, default `true`). The `#autopilot status` listing surfaces it for visibility.
+
+**Implementation:** new `AutopilotBehavior` (extends `Behavior`, registered in `Baritone.java`) ticks all four watchers per frame; new `SleepHelper` extracts bed-search + night-detection from `SleepCommand`. 12 new settings under `Settings.java` (search "Autopilot Survival" comment block).
+
+**Known limitation:** auto-eat and auto-torch only act on items already in the **hotbar** — MC 26.1.2's `ClickType.SWAP` API was renamed, so cross-slot swapping is left for a follow-up. Keep food and torches in your hotbar for the autopilot to use them.
+
+---
+
 ### New Commands
 
 #### `#structure <name>` / `#struct` / `#locate`

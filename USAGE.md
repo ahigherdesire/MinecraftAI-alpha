@@ -6,6 +6,79 @@ Type `#help` in-game for a searchable, clickable list of all commands.
 
 ---
 
+## 🛡️ Autopilot Survival &nbsp;·&nbsp; 🧪 EXPERIMENTAL
+
+> ⚠️ **All Autopilot Survival features are experimental.** They may misfire, fail to act, or interact poorly with other Baritone processes. Each command shows a one-time in-chat warning when enabled. Toggle off with the same command or `#autopilot off`.
+
+Reactive features that keep you alive while idle or while another command is running. All default off.
+
+```
+#autopilot on               → turn on autoEat + autoFlee + autoSleep + autoTorch
+#autopilot off              → turn them all off
+#autopilot status           → see what's enabled and at what thresholds
+```
+
+### Individual commands
+
+```
+#autoeat                    → toggle hunger watcher
+#autoeat 10                 → set threshold to 10 (out of 20) and enable
+#autoeat status             → show settings
+
+#autoflee                   → toggle low-health flee
+#autoflee 4                 → set trigger to 4 HP and enable
+#autoflee status            → show settings
+
+#autosleep                  → toggle night-time bed autopilot
+#autosleep interrupt        → toggle whether it interrupts active tasks
+#autosleep status           → show settings
+
+#autotorch                  → toggle dark-cave torch placer
+#autotorch 6                → set light threshold to 6 and enable
+#autotorch surface          → toggle whether to place torches on the surface (default: caves only)
+#autotorch status           → show settings
+```
+
+### Behavior
+
+- **autoEat:** when `foodLevel < autoEatThreshold` and food is in your hotbar, holds right-click to eat. Suppressed mid-elytra-flight, when a GUI is open, or while fleeing. Skips suspicious stew, rotten flesh, poisonous potato, pufferfish, spider eye, and golden apples (unless `autoEatAllowGapples = true`).
+- **autoFlee:** when `health <= autoFleeThreshold`, snapshots position and sets a `GoalRunAway`. Releases when health recovers above `autoFleeRecoverThreshold`. Won't trigger while elytra-flying (no foot escape route).
+- **autoSleep:** at night or thunderstorm, navigates to the nearest **cached** bed. Won't yank you out of an active task unless `autoSleepInterruptTasks = true`. Cached only — walk near your bed once so Baritone learns its location.
+- **autoTorch:** at the configured light level, drops a torch on the floor. Disabled in Nether and End. Restricted to caves (sky-light < 4) by default.
+
+### Death waypoints (built-in)
+
+Baritone's built-in `WaypointBehavior` already saves a death-position waypoint on every death. Setting `doDeathWaypoints` (default `true`) controls it. After dying, click the chat link to navigate back to your stuff.
+
+### Limitation
+
+`#autoeat` and `#autotorch` operate on the **hotbar** only. MC 26.1.2's `ClickType.SWAP` API moved/renamed; cross-slot inventory swap is deferred. Keep food and torches in your hotbar.
+
+---
+
+## Sleep
+
+```
+#sleep
+```
+
+Find the nearest cached bed (any of 16 colours), navigate via `GoalNear(bed, 1)`, then on a background thread wait for night-time (or a thunderstorm) and right-click. Cancel any time with `#cancel`.
+
+If no bed is in the cache, walk near a bed first so Baritone caches it, then re-run.
+
+---
+
+## Run away
+
+```
+#runaway             → flee 32 blocks (default)
+#runaway 100         → flee 100 blocks
+```
+
+Locks the origin to where you're standing when the command runs, then sets `GoalRunAway(distance, origin)`. The bot stops once it's far enough away. Aliases: `#flee`, `#escape`.
+
+---
+
 ## Navigation
 
 | Command | Description |
@@ -58,10 +131,13 @@ Works in **any dimension** — overworld, Nether, End. Requires elytra equipped 
 
 - `#elytra goto X Z` — fly to coordinates (bot handles height automatically)
 - `#elytra goto X Y Z` — fly to an exact block position
+- `#elytra goto ~500 ~ ~-200` — tilde notation: relative to your current position
 - `#elytra` (no args) — fly to whatever goal was set with `#goal` beforehand
 - `#elytra reset` — reset pathfinding state (keeps flying to same goal, useful if stuck)
 - `#elytra repack` — reload all chunks into the pathfinder (use after terrain changes)
 - `#elytra supported` — check if the native pathfinding library loaded correctly
+
+**Crash-proof destinations:** if the target Y is inside terrain or in an unloaded chunk where seed-predicted terrain might be solid, the bot automatically lifts to a safe altitude above natural terrain (Y≈200 in the overworld, Y=115 in the Nether, Y=80 in the End). If the target is genuinely underground, the bot flies to the surface above it and hands off to ground pathfinding to mine down. This avoids the native pathfinder's JVM-crashing segfault on solid destinations.
 
 Baritone will:
 1. Find a nearby ledge or cliff to jump from (auto-jump)
@@ -187,7 +263,8 @@ Aliases: `#nc`, `#coords`
 ## Portal navigation
 
 ```
-#whereportal
+#whereportal         → go to the nearest nether portal (and enter it)
+#portal skip         → blacklist the nearest portal, try the next one
 ```
 
 Navigates to the nearest nether portal in your current dimension. Portal blocks are part of Baritone's block cache — any portal you've been near is found immediately. If no portal is in the cache, Baritone will explore to find one.
@@ -199,6 +276,8 @@ To navigate to the portal without entering it:
 #set enterPortal false
 #whereportal
 ```
+
+**`#portal skip`** — useful when the closest portal is unreachable. Marks it as unreachable and searches for the next one. Run again to skip further candidates.
 
 Works in both directions:
 - In the **overworld** → finds an overworld portal frame (to enter the Nether)
@@ -304,6 +383,26 @@ Commonly changed settings:
 | `followRadius` | 3 | Distance to maintain when following |
 | `blockPlacementPenalty` | 20 | Ticks penalty per block placed |
 | `acceptableThrowawayItems` | cobble/dirt/netherrack | Blocks usable as scaffolding |
+| `doDeathWaypoints` | true | Save clickable waypoint on player death |
+| `doBedWaypoints` | true | Save waypoint when right-clicking a bed |
+
+**Autopilot Survival settings:**
+
+| Setting | Default | Notes |
+|---------|---------|-------|
+| `autoEat` | false | Master enable for hunger watcher |
+| `autoEatThreshold` | 14 | Hunger level (out of 20) below which to eat |
+| `autoEatAllowGapples` | false | Allow eating golden / enchanted golden apples |
+| `autoFlee` | false | Master enable for low-health flee |
+| `autoFleeThreshold` | 6.0 | HP below which to start fleeing |
+| `autoFleeRecoverThreshold` | 16.0 | HP above which to stop fleeing |
+| `autoFleeDistance` | 48 | Blocks to flee |
+| `autoSleep` | false | Master enable for night-time bed autopilot |
+| `autoSleepInterruptTasks` | false | Yank player out of active tasks to sleep |
+| `autoTorch` | false | Master enable for cave-torch placer |
+| `autoTorchLightLevel` | 8 | Block-light level below which to place torch |
+| `autoTorchIntervalTicks` | 100 | Minimum ticks between consecutive placements |
+| `autoTorchOnlyInCaves` | true | Only place when sky-light < 4 |
 
 ---
 
@@ -320,3 +419,13 @@ Commonly changed settings:
 **`#whereportal` says no portal found** — the portal needs to be within a chunk you've previously loaded. Walk to the portal area first so it gets cached, then use the command.
 
 **`#nether` shows wrong direction** — use the explicit form: `#nether overworld X Y Z` or `#nether nether X Y Z` to force the conversion direction regardless of your current dimension.
+
+**`#autoeat` isn't eating** — make sure food is in your hotbar (slots 1–9). The autopilot reads `[Autopilot] auto-eat: food found in main inventory slot N — move it to your hotbar` once when food is detected in the wrong place. Cross-slot swap is deferred to a follow-up due to a renamed MC 26.1.2 API.
+
+**`#autotorch` isn't placing torches** — same hotbar-only limitation as auto-eat. Also note that by default it only fires in caves (sky-light < 4); on the surface, run `#autotorch surface` to allow placement.
+
+**`#autoflee` panics in lava / cliffs** — `GoalRunAway` doesn't know about hazards. If you're in a particularly dangerous biome, use `#cancel` and handle it manually, or raise `autoFleeThreshold` so it triggers later.
+
+**`#autopilot on` did nothing visible** — it sets four boolean settings; nothing happens until the watched conditions are met (hunger drops, health drops, night falls, light < 8). Run `#autopilot status` to confirm everything is enabled.
+
+**`#elytra goto` lifts to a high Y instead of going to the exact Y I asked** — this is intentional. The native pathfinder will crash the game if it hits seed-predicted solid terrain at the destination in an unloaded chunk. For underground destinations the bot flies to the surface then mines down. For high-Y destinations in unloaded chunks it lifts to a safe altitude. Use a loaded-chunk destination if you need exact Y placement.
