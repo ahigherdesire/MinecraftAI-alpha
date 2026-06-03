@@ -380,8 +380,19 @@ public class ElytraProcess extends BaritoneProcessHelper implements IBaritonePro
                 }
             } else if (destination.getY() < seaLevel - 20) {
                 // Chunk not loaded but Y is suspiciously low — treat as underground.
+                // User likely meant "fly there and mine down" — track the ground target.
                 isSolid = true;
                 surfaceY = Math.max(destination.getY() + 60, seaLevel + 30);
+            } else if (destination.getY() < safeDefaultAltitude()) {
+                // Chunk not loaded and Y sits in the range where seed-predicted terrain
+                // (mountains, hills, netherrack) may exist. The native pathfinder will
+                // segfault if its prediction says solid at the destination. Lift the
+                // destination to a safe altitude above predicted natural terrain.
+                // No pendingGroundTarget — user didn't ask to land underground.
+                final int safeY = safeDefaultAltitude();
+                logDirect("Destination chunk is unloaded; raising Y from " + destination.getY()
+                        + " to safe altitude Y=" + safeY + " to avoid predicted-terrain collision.");
+                destination = new BlockPos(destination.getX(), safeY, destination.getZ());
             }
 
             if (isSolid) {
@@ -412,7 +423,12 @@ public class ElytraProcess extends BaritoneProcessHelper implements IBaritonePro
         if (iGoal instanceof GoalXZ) {
             GoalXZ goal = (GoalXZ) iGoal;
             x = goal.getX();
-            y = 64;
+            // CRITICAL: hardcoding Y=64 here caused JVM crashes on `#elytra goto X Z`.
+            // If the destination chunk is unloaded and the seed-predicted terrain at
+            // (X, 64, Z) is solid (any mountain, hill, or netherrack column), the native
+            // pathfinder segfaults. Pick a dimension-appropriate Y above predicted terrain.
+            // The pathfinder will then navigate down on its own.
+            y = safeDefaultAltitude();
             z = goal.getZ();
         } else if (iGoal instanceof GoalBlock) {
             GoalBlock goal = (GoalBlock) iGoal;
@@ -430,6 +446,37 @@ public class ElytraProcess extends BaritoneProcessHelper implements IBaritonePro
             throw new IllegalArgumentException("The y of the goal (" + y + ") is outside the world bounds [" + minY + ", " + maxY + ")");
         }
         this.pathTo(new BlockPos(x, y, z));
+    }
+
+    /**
+     * Returns a Y altitude that is above predicted natural terrain for the current dimension.
+     * Used as (1) the default Y when only an XZ goal is given, and (2) a safe redirect target
+     * when the destination chunk is unloaded and we can't verify whether the user's Y is air or solid.
+     *
+     * <p>The native pathfinder ({@code NetherPathfinder.pathFind}) predicts terrain from the seed
+     * in unloaded chunks and segfaults the entire JVM if the predicted block at the destination
+     * is solid. Flying to a Y above natural terrain avoids this — the pathfinder then navigates
+     * down on its own through loaded chunks where it can read real block data.
+     */
+    private int safeDefaultAltitude() {
+        if (ctx.world() == null) {
+            return 200; // best guess; ctx.world() should never be null on this code path
+        }
+        if (ctx.world().dimension() == Level.NETHER) {
+            // Nether ceiling is at Y=127. Netherrack mountains can reach ~Y=110 but rarely higher.
+            // Y=115 sits in the usual ceiling air gap.
+            return 115;
+        }
+        if (ctx.world().dimension() == Level.END) {
+            // End islands top out around Y=60. Y=80 is comfortably above them.
+            return 80;
+        }
+        // Overworld and custom dimensions: mountains can reach ~Y=256, but the pathfinder will
+        // navigate around terrain regardless. seaLevel (62) + 140 = 202 — above virtually all
+        // natural terrain across vanilla biomes.
+        final int seaLevel = ctx.world().getSeaLevel();
+        final int maxY = ctx.world().getMaxY();
+        return Math.min(maxY - 20, seaLevel + 140);
     }
 
     private boolean shouldLandForSafety() {
