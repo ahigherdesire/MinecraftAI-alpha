@@ -2,6 +2,12 @@
 
 A Minecraft pathfinding bot forked from [Baritone](https://github.com/cabaletta/baritone), updated for **Minecraft 26.1.2** (Java 25, Fabric 0.18.4) with several new features.
 
+> ## 🚧 Major update coming: **Autopilot Survival**
+>
+> The next release will make Baritone **keep you alive** while idle or running other commands — auto-eat when hungry, auto-flee at low health, auto-sleep at night, auto-place torches in dark caves, automatic death-point waypointing, and a single `#autopilot` master toggle.
+>
+> Read the full plan in **[UPCOMING.md](UPCOMING.md)**.
+
 ## Download
 
 **Latest build:** `build/libs/baritone-1.0.0-mc26.1.2-dirty.jar`
