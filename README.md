@@ -20,6 +20,8 @@ Drop this jar into your Minecraft `mods/` folder alongside Fabric Loader 0.18.4.
 
 > Minecraft 26.1.2 is fully unobfuscated so there is no remapping step — the jar contains plain class names.
 
+> **📖 Full guide: [GUIDE.md](GUIDE.md)** — every command, every feature, common workflows, troubleshooting. Start here if you just got this JAR.
+
 ## Quick start
 
 Type commands in chat with the `#` prefix:
