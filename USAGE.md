@@ -54,6 +54,52 @@ Locks the origin to where you're standing when the command runs, then sets `Goal
 
 ---
 
+## Base finder
+
+```
+#bases               → top 10 likely bases in current dimension
+#bases 25            → top 25
+#bases pie           → indicator type breakdown
+#bases 1 goto        → path to base #1
+```
+
+Reads Baritone's per-dimension chunk cache, finds clusters of base-indicator blocks (beacons, ender chests, enchanting tables, anvils, shulkers, brewing stands, beds, chests), and ranks them by weighted score.
+
+**Example output:**
+```
+══ Detected bases (4 total, showing top 10) ══
+ 1. score  247 │ X= 8421 Z=-2156 │ 47 indicators │ ~9482 blocks │ 12× shulker, 8× ender_chest, 6× bed, 4× anvil
+ 2. score  184 │ X=-4392 Z= 6011 │ 31 indicators │ ~7611 blocks │ 8× ender_chest, 8× anvil, 4× shulker, 3× bed
+ 3. score   95 │ X=  512 Z= -840 │ 18 indicators │ ~ 942 blocks │ 4× ender_chest, 4× anvil, 2× enchanting_table, 2× bed
+ 4. score   38 │ X= -200 Z=  300 │  6 indicators │ ~ 412 blocks │ 2× anvil, 1× ender_chest, 1× bed, 2× chest
+```
+
+**How it works:**
+1. Pulls every indicator block position from the chunk cache.
+2. Clusters by 2D (X/Z) proximity using DBSCAN with `baseFinderEpsilon` (default 50 blocks).
+3. Scores each cluster: `beacon=50, ender_chest=30, enchanting_table=25, brewing_stand=15, anvil=15, shulker=15, trapped_chest=10, bed=8, chest=3, furnace=2, dragon_egg=100`.
+4. Filters out clusters below `baseFinderMinScore` (default 30) or with fewer than `baseFinderMinIndicators` (default 3) blocks.
+5. Sorts descending by score, prints top N.
+
+**Tuning settings:**
+
+| Setting | Default | Notes |
+|---|---|---|
+| `baseFinderMinScore` | 30 | Lower to surface smaller outposts |
+| `baseFinderMinIndicators` | 3 | Raise to filter noise on huge servers |
+| `baseFinderEpsilon` | 50 | Cluster radius in blocks; raise on sprawling bases |
+
+**Notes:**
+- Reads cache only — no packets, no live scan, no anticheat surface. Bulletproof.
+- Only finds blocks in chunks you've previously loaded. Elytra-fly long distances at high altitude with `chunkCaching=true` to populate the cache.
+- Per-dimension. Cached blocks in the Nether/End won't appear in an Overworld scan; run `#bases` in each dimension separately.
+- The Y coordinate isn't shown — bases are XZ clusters; the goal uses `GoalXZ` for navigation.
+
+Aliases: `#basefinder`.
+
+
+---
+
 ## Navigation
 
 | Command | Description |
@@ -369,6 +415,14 @@ Commonly changed settings:
 | `autoSleepInterruptTasks` | false | Yank player out of active tasks to sleep |
 
 (Earlier plan also included `autoEat*`, `autoFlee*`, `autoTorch*` settings; those features were dropped — see FEATURES.md.)
+
+**Base finder settings:**
+
+| Setting | Default | Notes |
+|---------|---------|-------|
+| `baseFinderMinScore` | 30 | Minimum weighted score for a cluster to count as a "base" |
+| `baseFinderMinIndicators` | 3 | Minimum number of indicator blocks in a cluster |
+| `baseFinderEpsilon` | 50 | DBSCAN cluster radius in blocks |
 
 ---
 

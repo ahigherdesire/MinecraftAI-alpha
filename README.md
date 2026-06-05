@@ -36,6 +36,7 @@ Type commands in chat with the `#` prefix:
 #seedinput <seed>           → store your world seed for multiplayer structure finding
 #sleep                      → go to the nearest bed and sleep when night falls
 #runaway 50                 → flee 50 blocks away from the current position
+#bases                      → find likely player bases by clustering cached indicator blocks
 #stop                       → stop everything
 #help                       → list all commands with descriptions and tab completion
 ```

@@ -9,6 +9,20 @@
 
 **Dropped from this update:** the originally-planned `#autoeat`, `#autoflee`, `#autotorch`, and `#autopilot` master toggle were removed because **Meteor Client already provides equivalents** and duplicating them in Baritone wasn't worth the maintenance cost. The design spec for the dropped pieces remains in `UPCOMING.md` as a reference.
 
+## Base finder
+
+- **`#bases`** — Scans Baritone's per-dimension chunk cache for **clusters** of "base indicator" blocks (beacons, ender chests, enchanting tables, anvils, shulkers, brewing stands, beds, chests). Each cluster gets a weighted score; the top N are likely player bases.
+- **Pure cache reader** — no packets sent, no live scan, no anticheat surface. The data is already on your disk.
+- **DBSCAN clustering** with configurable `baseFinderEpsilon` (default 50 blocks). Cluster scores use a weight table where beacons count 50, ender chests 30, enchanting tables 25, shulkers 15, beds 8, chests 3.
+- **Subcommands:**
+  - `#bases` — top 10 by score
+  - `#bases <N>` — top N
+  - `#bases pie` — type breakdown (how many of each indicator across the whole cache)
+  - `#bases <N> goto` — path to the Nth base via `GoalXZ`
+- **Only finds what you've explored.** Best workflow: elytra-fly long distances at high altitude with `chunkCaching=true` to populate the cache, then run `#bases`.
+- **Per-dimension.** Run separately in the Overworld, Nether, and End.
+- Aliases: `#basefinder`.
+
 ## Sleep and retreat
 
 - **`#sleep`** — explicit one-shot: finds the nearest cached bed (any of 16 colours), navigates with `GoalNear(bed, 1)`, then on a background thread waits for night and right-clicks to sleep. Cancel any time with `#cancel`.

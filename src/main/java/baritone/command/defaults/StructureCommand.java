@@ -135,18 +135,39 @@ public class StructureCommand extends Command {
                 logDirect("Unknown structure: '" + input + "'. Check #help structure for a list.");
                 return;
             }
-            logDirect("Searching for nearest '" + input + "'...");
-            Thread searchThread = new Thread(() -> {
+            // Log what we're actually searching for — useful when tag expansion
+            // returns nothing or just one variant when we expected multiple.
+            int holderCount = 0;
+            for (Holder<Structure> h : holderSet) holderCount++;
+            logDirect("Searching for nearest '" + input + "' (" + holderCount + " structure variant"
+                + (holderCount == 1 ? "" : "s") + " in tag)...");
+
+            // CRITICAL: `findNearestMapStructure` must run on the server thread.
+            // It calls into the chunk generator's biome lookup which may need to
+            // load chunks — chunk loading is only safe on the server thread. Running
+            // it from a background thread caused silent failures: the biome check
+            // for any candidate whose chunk wasn't already loaded would return the
+            // wrong answer (or skip the candidate), so villages in unexplored biomes
+            // were invisible.
+            server.execute(() -> {
                 Pair<BlockPos, Holder<Structure>> found;
                 try {
                     found = serverLevel.getChunkSource().getGenerator()
                         .findNearestMapStructure(serverLevel, holderSet, searchOrigin, 100, false);
-                } catch (Exception e) {
+                } catch (Throwable t) {
+                    final String msg = t.getClass().getSimpleName() + ": " + t.getMessage();
                     Minecraft.getInstance().execute(() ->
-                        logDirect("Structure search failed: " + e.getMessage()));
+                        logDirect("Structure search failed: " + msg));
                     return;
                 }
                 final BlockPos result = found == null ? null : found.getFirst();
+                final String variantName;
+                if (found == null) {
+                    variantName = null;
+                } else {
+                    variantName = found.getSecond().unwrapKey()
+                        .map(k -> k.identifier().getPath()).orElse("?");
+                }
                 Minecraft.getInstance().execute(() -> {
                     if (result == null) {
                         logDirect("No '" + input + "' found within search range. "
@@ -156,14 +177,12 @@ public class StructureCommand extends Command {
                     int dx = result.getX() - searchOrigin.getX();
                     int dz = result.getZ() - searchOrigin.getZ();
                     int dist = (int) Math.sqrt(dx * dx + dz * dz);
-                    logDirect("Found '" + input + "'  X=" + result.getX()
-                        + "  Z=" + result.getZ() + "  (~" + dist + " blocks away)");
+                    logDirect("Found '" + variantName + "' (matched '" + input + "')  X="
+                        + result.getX() + "  Z=" + result.getZ() + "  (~" + dist + " blocks away)");
                     baritone.getCustomGoalProcess().setGoalAndPath(
                         new GoalXZ(result.getX(), result.getZ()));
                 });
-            }, "BaritoneStructureSearch");
-            searchThread.setDaemon(true);
-            searchThread.start();
+            });
             return;
         }
 

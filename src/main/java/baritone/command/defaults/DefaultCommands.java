@@ -76,7 +76,8 @@ public final class DefaultCommands {
                 new PortalCommand(baritone),
                 new SleepCommand(baritone),
                 new RunAwayCommand(baritone),
-                new AutoSleepCommand(baritone)
+                new AutoSleepCommand(baritone),
+                new BasesCommand(baritone)
         ));
         ExecutionControlCommands prc = new ExecutionControlCommands(baritone);
         commands.add(prc.pauseCommand);

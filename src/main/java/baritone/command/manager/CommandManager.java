@@ -27,6 +27,7 @@ import baritone.api.command.exception.ICommandException;
 import baritone.api.command.helpers.TabCompleteHelper;
 import baritone.api.command.manager.ICommandManager;
 import baritone.api.command.registry.Registry;
+import baritone.auth.Authorization;
 import baritone.command.argument.ArgConsumer;
 import baritone.command.argument.CommandArguments;
 import baritone.command.defaults.DefaultCommands;
@@ -80,6 +81,14 @@ public class CommandManager implements ICommandManager {
 
     @Override
     public boolean execute(Tuple<String, List<ICommandArgument>> expanded) {
+        // Authorization chokepoint: every command dispatch must pass this check.
+        // See baritone.auth.Authorization for the allowlist, offline-mode detection,
+        // and watermark logic. If unauthorized, the auth check itself prints the
+        // explanatory chat message, and we silently consume the command (return true)
+        // so the user doesn't get an additional "unknown command" line.
+        if (!Authorization.isAuthorized()) {
+            return true;
+        }
         ExecutionWrapper execution = this.from(expanded);
         if (execution != null) {
             execution.execute();

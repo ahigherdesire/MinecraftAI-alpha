@@ -653,6 +653,17 @@ public final class Settings {
     /** When false, auto-sleep skips activation if another process is controlling pathing. */
     public final Setting<Boolean> autoSleepInterruptTasks = new Setting<>(false);
 
+    // ════════════════════════════════════════════════════════════════════════
+    //  Base finder (#bases) — DBSCAN clustering over cached indicator blocks
+    // ════════════════════════════════════════════════════════════════════════
+
+    /** Minimum weighted score for a cluster to count as a "base" (default 30). */
+    public final Setting<Integer> baseFinderMinScore = new Setting<>(30);
+    /** Minimum number of indicator blocks in a cluster (default 3). */
+    public final Setting<Integer> baseFinderMinIndicators = new Setting<>(3);
+    /** DBSCAN epsilon (cluster radius) in blocks (default 50). */
+    public final Setting<Integer> baseFinderEpsilon = new Setting<>(50);
+
     /**
      * The big one. Download all chunks in simplified 2-bit format and save them for better very-long-distance pathing.
      */
