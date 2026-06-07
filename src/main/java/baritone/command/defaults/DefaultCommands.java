@@ -77,7 +77,8 @@ public final class DefaultCommands {
                 new SleepCommand(baritone),
                 new RunAwayCommand(baritone),
                 new AutoSleepCommand(baritone),
-                new BasesCommand(baritone)
+                new BasesCommand(baritone),
+                new ActivateCommand(baritone)
         ));
         ExecutionControlCommands prc = new ExecutionControlCommands(baritone);
         commands.add(prc.pauseCommand);

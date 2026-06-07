@@ -6,6 +6,21 @@ Type `#help` in-game for a searchable, clickable list of all commands.
 
 ---
 
+## Activation
+
+```
+#activate <token>
+```
+
+Enter your license token once. The token is saved to `baritone/license.key` and verified automatically on every future session — you never need to type it again unless the token expires or you reinstall Minecraft.
+
+- Token expired or invalid → `Error 001. Please contact owner.`
+- No token at all → `Type #activate <token> to activate.`
+
+Aliases: `#license`
+
+---
+
 ## 🛡️ Autopilot Survival &nbsp;·&nbsp; 🧪 EXPERIMENTAL
 
 > ⚠️ **Experimental.** `#autosleep` may misfire, fail to act, or interact poorly with other Baritone processes. Prints a one-time in-chat warning when enabled. Toggle off with `#autosleep off`.

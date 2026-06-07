@@ -6,6 +6,27 @@ All notable changes to this Baritone fork are documented here.
 
 ## [Unreleased] — MC 26.1.2
 
+### Access control overhaul
+Replaced the UUID allowlist with an **RSA-2048 signed token system**.
+
+- `#activate <token>` — new command, always permitted (bypasses auth check). Validates and saves the token to `baritone/license.key`.
+- `#license` — alias for `#activate`.
+- Tokens are generated offline by the owner via `tools/generate_license.ps1 -Name "X" -Days 90`. No source edit or recompile needed to add or revoke users.
+- Token format: `Base64(name|YYYY-MM-DD).<RSA-SHA256-signature>`. Cannot be forged without the private key, which is gitignored and never in the JAR.
+- Revocation is automatic via expiry — just don't renew.
+- Error messages: no-license → yellow activation prompt; invalid/expired → `Error 001. Please contact owner.`
+
+### JourneyMap integration (optional, auto-detected)
+Added optional [JourneyMap](https://www.curseforge.com/minecraft/mc-mods/journeymap) 6.x integration. Activates automatically when JourneyMap is present; does nothing if absent.
+
+- **Auto-waypoints** — `#structure`/`#where` drop a gold JourneyMap waypoint on found structures. `#bases` drops a purple waypoint for each detected base.
+- **Right-click #goto** — "Baritone #goto" option added to the JourneyMap fullscreen right-click menu. Clicking it starts Baritone pathing to the clicked map position. Useful on multiplayer where JourneyMap's own Teleport is unavailable.
+
+### Bug fixes
+- **`#bases` game freeze** — the entire scan (35+ cache reads + DBSCAN) now runs on a background thread. Results are delivered to the game thread when ready. No more tick stutter.
+- **`#structure village` "cannot find"** — the `#minecraft:village` structure tag was empty in MC 26.1.2. Village lookup now uses direct structure IDs (`village_plains`, `village_desert`, `village_savanna`, `village_snowy`, `village_taiga`). Added zero-variant guard so future empty tags produce a clear error rather than a silent null search.
+- **`#structure` / `#where` threading** — `resolveStructures()` now runs inside `server.execute()` instead of on the client thread, matching the threading rules for all other server-level registry access.
+
 ### 🛡️ Autopilot Survival update 🧪 *experimental*
 
 Originally planned with four reactive watchers (auto-eat / auto-flee / auto-sleep / auto-torch) plus an `#autopilot` master toggle. **Three of the four were dropped** because **Meteor Client already provides equivalents** — duplicating them in Baritone wasn't worth the maintenance cost. Only auto-sleep remains, since it's tightly coupled to Baritone's bed cache and the existing `#sleep` command.

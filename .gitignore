@@ -33,6 +33,10 @@ baritone_Client.launch
 CLAUDE.md
 CLAUDE.local.md
 .claude/
+
+# License system — private key must NEVER be committed
+# If you lose this file you cannot generate new licenses without a full keypair rotation.
+private_key.b64
 # Copyright Files
 !/.idea/copyright/Baritone.xml
 !/.idea/copyright/profiles_settings.xml

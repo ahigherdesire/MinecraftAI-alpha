@@ -87,12 +87,16 @@ public class CommandManager implements ICommandManager {
         // and watermark logic. If unauthorized, the auth check itself prints the
         // explanatory chat message, and we silently consume the command (return true)
         // so the user doesn't get an additional "unknown command" line.
-        if (!Authorization.isAuthorized()) {
-            return true;
+        // #activate is always allowed so unactivated players can enter their token.
+        String cmdName = expanded.getA().toLowerCase(java.util.Locale.ROOT);
+        if (!cmdName.equals("activate") && !cmdName.equals("license")) {
+            if (!Authorization.isAuthorized()) {
+                return true;
+            }
+            // Lazy JourneyMap integration: subscribe our right-click "#goto" popup item
+            // the first time any authorized command runs (JM guaranteed loaded by then).
+            JourneyMapHelper.ensureSubscribed();
         }
-        // Lazy JourneyMap integration: subscribe our right-click "#goto" popup item
-        // the first time any authorized command runs (JM guaranteed loaded by then).
-        JourneyMapHelper.ensureSubscribed();
         ExecutionWrapper execution = this.from(expanded);
         if (execution != null) {
             execution.execute();

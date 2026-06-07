@@ -12,15 +12,22 @@ A Minecraft pathfinding bot forked from [Baritone](https://github.com/cabaletta/
 >
 > See [CHANGELOG.md](CHANGELOG.md) for details.
 
-## Download
+## Download & setup
 
-**Latest build:** `build/libs/baritone-1.0.0-mc26.1-dirty.jar` *(targets MC 26.1.2; the JAR filename uses the short minor)*
-
-Drop this jar into your Minecraft `mods/` folder alongside Fabric Loader 0.18.4. No other mods required.
-
-> Minecraft 26.1.2 is fully unobfuscated so there is no remapping step — the jar contains plain class names.
+1. Drop `build/libs/miencraftai-dirty.jar` into your `mods/` folder alongside Fabric Loader 0.18.4.
+2. Launch Minecraft. On first command you'll see:
+   ```
+   [MinecraftAI] Type #activate <token> to activate.
+   ```
+3. Enter the token you were given:
+   ```
+   #activate <your-token>
+   ```
+   Saved permanently — you only need to do this once.
 
 > **📖 Full guide: [GUIDE.md](GUIDE.md)** — every command, every feature, common workflows, troubleshooting. Start here if you just got this JAR.
+
+> Minecraft 26.1.2 is fully unobfuscated so there is no remapping step — the jar contains plain class names.
 
 ## Quick start
 
@@ -125,6 +132,16 @@ Aliases: `#portal`, `#findportal`
 - The pathfinder's voxel octree now packs **all** chunk sections (overworld has 24 sections, −64 to +320) with correct absolute Y coordinates. Previously only the bottom 8 sections (Y 0–127) were packed, so mountains above sea level were invisible.
 - Block-update tracking no longer has a `y >= 128` cutoff.
 - New `goto` subcommand: `#elytra goto X Z` or `#elytra goto X Y Z`.
+
+## JourneyMap integration
+
+If [JourneyMap](https://www.curseforge.com/minecraft/mc-mods/journeymap) is installed:
+
+- **`#structure`** and **`#where`** automatically drop a gold waypoint on the map when a structure is found.
+- **`#bases`** drops a purple waypoint for every detected base cluster.
+- **Right-click anywhere on the fullscreen map** → select **"Baritone #goto"** → the bot starts pathing there. Works on multiplayer where JourneyMap's built-in Teleport is unavailable.
+
+No extra configuration — the integration activates automatically if JourneyMap is present.
 
 ## Commands reference
 

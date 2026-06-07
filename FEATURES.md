@@ -1,5 +1,23 @@
 # Features
 
+## Access control
+
+MinecraftAI is access-controlled via **RSA-signed license tokens**. No UUID configuration required on the owner's end.
+
+- **`#activate <token>`** — enter a token once to activate. Saved to `baritone/license.key` and verified automatically on every future session.
+- Tokens embed a display name and an expiry date. When the token expires the mod stops working until a new token is issued.
+- The owner generates tokens with `tools/generate_license.ps1` — no source edit or recompile needed.
+- Anyone without a valid token sees only: `Error 001. Please contact owner.`
+
+## JourneyMap integration
+
+When [JourneyMap](https://www.curseforge.com/minecraft/mc-mods/journeymap) is installed alongside this mod:
+
+- **Auto-waypoints** — `#structure` and `#where` automatically drop a **gold** JourneyMap waypoint when a structure is found. `#bases` drops a **purple** waypoint for each detected base cluster.
+- **Right-click #goto** — right-clicking anywhere on the fullscreen map shows a **"Baritone #goto"** option. Clicking it sends Baritone to that map position. Works on multiplayer where JourneyMap's own Teleport option is greyed out.
+
+The integration activates automatically if JourneyMap is present and requires no configuration.
+
 ## 🛡️ Autopilot Survival &nbsp;·&nbsp; 🧪 EXPERIMENTAL
 
 > ⚠️ **Experimental.** `#autosleep` may misfire or interact poorly with other Baritone processes (`#mine`, `#elytra`, `#farm`). Prints a one-time in-chat warning when enabled. Toggle off with `#autosleep off`.
