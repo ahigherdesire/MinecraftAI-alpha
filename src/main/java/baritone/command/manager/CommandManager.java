@@ -28,6 +28,7 @@ import baritone.api.command.helpers.TabCompleteHelper;
 import baritone.api.command.manager.ICommandManager;
 import baritone.api.command.registry.Registry;
 import baritone.auth.Authorization;
+import baritone.util.JourneyMapHelper;
 import baritone.command.argument.ArgConsumer;
 import baritone.command.argument.CommandArguments;
 import baritone.command.defaults.DefaultCommands;
@@ -89,6 +90,9 @@ public class CommandManager implements ICommandManager {
         if (!Authorization.isAuthorized()) {
             return true;
         }
+        // Lazy JourneyMap integration: subscribe our right-click "#goto" popup item
+        // the first time any authorized command runs (JM guaranteed loaded by then).
+        JourneyMapHelper.ensureSubscribed();
         ExecutionWrapper execution = this.from(expanded);
         if (execution != null) {
             execution.execute();

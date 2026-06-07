@@ -19,6 +19,7 @@ package baritone.command.defaults;
 
 import baritone.api.IBaritone;
 import baritone.api.command.Command;
+import baritone.util.JourneyMapHelper;
 import baritone.api.command.argument.IArgConsumer;
 import baritone.api.command.exception.CommandException;
 import baritone.api.command.exception.CommandInvalidStateException;
@@ -85,20 +86,25 @@ public class WhereCommand extends Command {
                 throw new CommandInvalidStateException(
                     "Current dimension is not available on the integrated server.");
             }
-            HolderSet<Structure> holderSet = StructureCommand.resolveStructures(query, serverLevel);
-            if (holderSet == null) {
-                logDirect("Unknown structure: '" + input + "'. Check #help structure for a list.");
-                return;
-            }
-            int holderCount = 0;
-            for (Holder<Structure> h : holderSet) holderCount++;
-            logDirect("Searching for nearest '" + input + "' (" + holderCount + " structure variant"
-                + (holderCount == 1 ? "" : "s") + ")...");
-
-            // Run the search on the server thread (see StructureCommand for full rationale).
-            // findNearestMapStructure may need to load chunks for biome checks; that's only
-            // safe on the server thread.
+            // Dispatch resolveStructures + the search to the server thread.
+            // Both may touch serverLevel internals that are only safe on that thread.
+            logDirect("Searching for nearest '" + input + "'...");
             server.execute(() -> {
+                HolderSet<Structure> holderSet = StructureCommand.resolveStructures(query, serverLevel);
+                if (holderSet == null) {
+                    Minecraft.getInstance().execute(() ->
+                        logDirect("Unknown structure: '" + input + "'. Check #help structure for a list."));
+                    return;
+                }
+                int holderCount = 0;
+                for (Holder<Structure> h : holderSet) holderCount++;
+                if (holderCount == 0) {
+                    Minecraft.getInstance().execute(() ->
+                        logDirect("Structure tag resolved but contains 0 variants for '" + input
+                            + "' in this MC version — cannot search."));
+                    return;
+                }
+
                 Pair<BlockPos, Holder<Structure>> found;
                 try {
                     found = serverLevel.getChunkSource().getGenerator()
@@ -132,6 +138,8 @@ public class WhereCommand extends Command {
                         + "  |  " + dir
                         + "  |  ~" + dist + " blocks"
                         + "  |  (use #structure " + input + " to go there)");
+                    JourneyMapHelper.addWaypoint(
+                        input + " (" + variantName + ")", result, JourneyMapHelper.COLOR_STRUCTURE);
                 });
             });
             return;

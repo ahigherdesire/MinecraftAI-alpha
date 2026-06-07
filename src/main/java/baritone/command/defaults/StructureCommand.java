@@ -19,6 +19,7 @@ package baritone.command.defaults;
 
 import baritone.api.IBaritone;
 import baritone.api.command.Command;
+import baritone.util.JourneyMapHelper;
 import baritone.api.command.argument.IArgConsumer;
 import baritone.api.command.exception.CommandException;
 import baritone.api.command.exception.CommandInvalidStateException;
@@ -38,6 +39,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.levelgen.structure.Structure;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -70,7 +72,10 @@ public class StructureCommand extends Command {
     static final Map<String, String> ALIASES = new HashMap<>();
     static {
         // --- structures with a StructureTags entry in MC 26.1.2 (all singular) ---
-        ALIASES.put("village",           "tag:village");
+        // Village: use direct structure IDs rather than the tag because in MC 26.1.2
+        // the #minecraft:village tag may resolve to 0 members, causing silent search failure.
+        // All five vanilla village variants are listed explicitly.
+        ALIASES.put("village", "ids:village_plains,village_desert,village_savanna,village_snowy,village_taiga");
         ALIASES.put("mineshaft",         "tag:mineshaft");
         ALIASES.put("mine",              "tag:mineshaft");
         ALIASES.put("shipwreck",         "tag:shipwreck");
@@ -130,26 +135,33 @@ public class StructureCommand extends Command {
                 throw new CommandInvalidStateException(
                     "Current dimension is not available on the integrated server.");
             }
-            HolderSet<Structure> holderSet = resolveStructures(query, serverLevel);
-            if (holderSet == null) {
-                logDirect("Unknown structure: '" + input + "'. Check #help structure for a list.");
-                return;
-            }
-            // Log what we're actually searching for — useful when tag expansion
-            // returns nothing or just one variant when we expected multiple.
-            int holderCount = 0;
-            for (Holder<Structure> h : holderSet) holderCount++;
-            logDirect("Searching for nearest '" + input + "' (" + holderCount + " structure variant"
-                + (holderCount == 1 ? "" : "s") + " in tag)...");
-
-            // CRITICAL: `findNearestMapStructure` must run on the server thread.
-            // It calls into the chunk generator's biome lookup which may need to
-            // load chunks — chunk loading is only safe on the server thread. Running
-            // it from a background thread caused silent failures: the biome check
-            // for any candidate whose chunk wasn't already loaded would return the
-            // wrong answer (or skip the candidate), so villages in unexplored biomes
-            // were invisible.
+            // Give immediate feedback, then dispatch to the server thread.
+            // resolveStructures uses serverLevel.registryAccess() and
+            // findNearestMapStructure may trigger chunk loading — both must run
+            // on the integrated-server thread, not the client thread.
+            logDirect("Searching for nearest '" + input + "'...");
             server.execute(() -> {
+                HolderSet<Structure> holderSet = resolveStructures(query, serverLevel);
+                if (holderSet == null) {
+                    Minecraft.getInstance().execute(() ->
+                        logDirect("Unknown structure: '" + input + "'. Check #help structure for a list."));
+                    return;
+                }
+                int holderCount = 0;
+                for (Holder<Structure> h : holderSet) holderCount++;
+                if (holderCount == 0) {
+                    // Tag resolved but is empty — findNearestMapStructure would return null
+                    // immediately with no useful error. Catch it early.
+                    Minecraft.getInstance().execute(() ->
+                        logDirect("Structure tag resolved but contains 0 variants for '" + input
+                            + "' in this MC version — cannot search. "
+                            + "Try a specific variant name (e.g. 'village_plains')."));
+                    return;
+                }
+                final int countSnap = holderCount;
+                Minecraft.getInstance().execute(() ->
+                    logDirect("Found " + countSnap + " variant" + (countSnap == 1 ? "" : "s") + ", searching..."));
+
                 Pair<BlockPos, Holder<Structure>> found;
                 try {
                     found = serverLevel.getChunkSource().getGenerator()
@@ -179,6 +191,8 @@ public class StructureCommand extends Command {
                     int dist = (int) Math.sqrt(dx * dx + dz * dz);
                     logDirect("Found '" + variantName + "' (matched '" + input + "')  X="
                         + result.getX() + "  Z=" + result.getZ() + "  (~" + dist + " blocks away)");
+                    JourneyMapHelper.addWaypoint(
+                        input + " (" + variantName + ")", result, JourneyMapHelper.COLOR_STRUCTURE);
                     baritone.getCustomGoalProcess().setGoalAndPath(
                         new GoalXZ(result.getX(), result.getZ()));
                 });
@@ -257,6 +271,19 @@ public class StructureCommand extends Command {
             var holderOpt = lookup.get(key);
             if (holderOpt.isEmpty()) return null;
             return HolderSet.direct(holderOpt.get());
+
+        } else if (query.startsWith("ids:")) {
+            // Comma-separated list of direct structure IDs — used when a tag is unreliable.
+            // Example: "ids:village_plains,village_desert,village_savanna,village_snowy,village_taiga"
+            String[] ids = query.substring(4).split(",");
+            List<Holder<Structure>> holders = new ArrayList<>();
+            for (String id : ids) {
+                ResourceKey<Structure> key = ResourceKey.create(
+                    Registries.STRUCTURE, Identifier.withDefaultNamespace(id.trim()));
+                lookup.get(key).ifPresent(holders::add);
+            }
+            if (holders.isEmpty()) return null;
+            return HolderSet.direct(holders);
         }
 
         return null;

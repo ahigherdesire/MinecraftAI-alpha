@@ -19,6 +19,7 @@ package baritone.command.defaults;
 
 import baritone.Baritone;
 import baritone.api.IBaritone;
+import baritone.util.JourneyMapHelper;
 import baritone.api.cache.ICachedWorld;
 import baritone.api.command.Command;
 import baritone.api.command.argument.IArgConsumer;
@@ -26,6 +27,7 @@ import baritone.api.command.exception.CommandException;
 import baritone.api.command.exception.CommandInvalidStateException;
 import baritone.api.pathing.goals.GoalXZ;
 import baritone.api.utils.BetterBlockPos;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 
 import java.util.ArrayList;
@@ -106,7 +108,7 @@ public class BasesCommand extends Command {
             throw new CommandInvalidStateException("No world loaded.");
         }
 
-        // Parse subcommands
+        // Parse subcommands on game thread (fast — no I/O)
         boolean pie = false;
         int topN = 10;
         int gotoIndex = -1;
@@ -137,97 +139,129 @@ public class BasesCommand extends Command {
         }
         args.requireMax(0);
 
+        // Capture everything the background thread needs before releasing the game thread.
         final BetterBlockPos origin = ctx.playerFeet();
         final ICachedWorld cache = ctx.worldData().getCachedWorld();
         final int epsilon = Math.max(8, Baritone.settings().baseFinderEpsilon.value);
         final int minScore = Math.max(0, Baritone.settings().baseFinderMinScore.value);
         final int minIndicators = Math.max(1, Baritone.settings().baseFinderMinIndicators.value);
+        final boolean finalPie = pie;
+        final int finalTopN = topN;
+        final int finalGotoIndex = gotoIndex;
 
-        // ── Step 1: pull every indicator position ────────────────────────────
-        logDirect("Scanning chunk cache for indicators...");
-        List<Indicator> points = new ArrayList<>();
-        Map<String, Integer> typeCounts = new HashMap<>();
-        for (Map.Entry<String, Integer> entry : INDICATORS.entrySet()) {
-            String name = entry.getKey();
-            int weight = entry.getValue();
-            ArrayList<BlockPos> positions = cache.getLocationsOf(
-                    name, Integer.MAX_VALUE, origin.x, origin.z, Integer.MAX_VALUE);
-            if (positions.isEmpty()) continue;
-            typeCounts.merge(name, positions.size(), Integer::sum);
-            for (BlockPos p : positions) {
-                points.add(new Indicator(p.getX(), p.getZ(), name, weight));
+        // Give immediate feedback so the player knows the command was received.
+        logDirect("Scanning chunk cache... (results in a moment)");
+
+        // All expensive work (disk reads + DBSCAN) runs off the game thread so
+        // Minecraft keeps rendering and responding normally.
+        Thread worker = new Thread(() -> {
+
+            // ── Step 1: pull every indicator position from the cache ───────────
+            List<Indicator> points = new ArrayList<>();
+            Map<String, Integer> typeCounts = new HashMap<>();
+            for (Map.Entry<String, Integer> entry : INDICATORS.entrySet()) {
+                String name = entry.getKey();
+                int weight = entry.getValue();
+                ArrayList<BlockPos> positions = cache.getLocationsOf(
+                        name, Integer.MAX_VALUE, origin.x, origin.z, Integer.MAX_VALUE);
+                if (positions.isEmpty()) continue;
+                typeCounts.merge(name, positions.size(), Integer::sum);
+                for (BlockPos p : positions) {
+                    points.add(new Indicator(p.getX(), p.getZ(), name, weight));
+                }
             }
-        }
 
-        if (points.isEmpty()) {
-            logDirect("No base indicators in cache for this dimension. "
-                    + "Walk or elytra-fly through more chunks to populate the cache, "
-                    + "then try again.");
-            return;
-        }
-
-        // ── #bases pie — type breakdown then exit ────────────────────────────
-        if (pie) {
-            int total = points.size();
-            logDirect("══ Indicator type breakdown (" + total + " total) ══");
-            typeCounts.entrySet().stream()
-                    .sorted((a, b) -> Integer.compare(b.getValue(), a.getValue()))
-                    .forEach(e -> {
-                        double pct = e.getValue() * 100.0 / total;
-                        logDirect(String.format("  %5d (%5.1f%%) %s", e.getValue(), pct, e.getKey()));
-                    });
-            return;
-        }
-
-        // ── Step 2: DBSCAN cluster ───────────────────────────────────────────
-        logDirect("Clustering " + points.size() + " indicators (epsilon=" + epsilon + " blocks)...");
-        List<List<Indicator>> clusters = dbscan(points, epsilon, minIndicators);
-
-        // ── Step 3: score and filter ─────────────────────────────────────────
-        List<Cluster> bases = new ArrayList<>();
-        for (List<Indicator> cl : clusters) {
-            int score = cl.stream().mapToInt(p -> p.weight).sum();
-            if (score < minScore) continue;
-            bases.add(new Cluster(cl, score));
-        }
-        bases.sort(Comparator.comparingInt((Cluster c) -> -c.score));
-
-        if (bases.isEmpty()) {
-            logDirect("No clusters scored ≥ " + minScore + ". Try lowering with "
-                    + "#set baseFinderMinScore <lower>, or widen with "
-                    + "#set baseFinderEpsilon <larger>.");
-            return;
-        }
-
-        // ── Step 4: print results ────────────────────────────────────────────
-        logDirect("══ Detected bases (" + bases.size() + " total, showing top "
-                + Math.min(topN, bases.size()) + ") ══");
-        for (int i = 0; i < Math.min(topN, bases.size()); i++) {
-            Cluster c = bases.get(i);
-            int cx = c.centerX();
-            int cz = c.centerZ();
-            int dx = cx - origin.x;
-            int dz = cz - origin.z;
-            int dist = (int) Math.sqrt(dx * dx + dz * dz);
-            String types = summarizeTypes(c.points);
-            logDirect(String.format(
-                    "%2d. score %4d │ X=%5d Z=%5d │ %2d indicators │ ~%5d blocks │ %s",
-                    i + 1, c.score, cx, cz, c.points.size(), dist, types));
-        }
-
-        // ── #bases <N> goto — path to the N'th base ──────────────────────────
-        if (gotoIndex > 0) {
-            if (gotoIndex > bases.size()) {
-                logDirect("Only " + bases.size() + " base"
-                        + (bases.size() == 1 ? "" : "s") + " found. Cannot goto #" + gotoIndex + ".");
+            if (points.isEmpty()) {
+                Minecraft.getInstance().execute(() ->
+                    logDirect("No base indicators in cache for this dimension. "
+                            + "Walk or elytra-fly through more chunks to populate the cache, "
+                            + "then try again."));
                 return;
             }
-            Cluster target = bases.get(gotoIndex - 1);
-            int cx = target.centerX();
-            int cz = target.centerZ();
-            logDirect("→ Pathing to base #" + gotoIndex + " at X=" + cx + " Z=" + cz);
-            baritone.getCustomGoalProcess().setGoalAndPath(new GoalXZ(cx, cz));
-        }
+
+            // ── #bases pie — type breakdown then exit ─────────────────────────
+            if (finalPie) {
+                int total = points.size();
+                List<Map.Entry<String, Integer>> sorted = new ArrayList<>(typeCounts.entrySet());
+                sorted.sort((a, b) -> Integer.compare(b.getValue(), a.getValue()));
+                Minecraft.getInstance().execute(() -> {
+                    logDirect("══ Indicator type breakdown (" + total + " total) ══");
+                    for (Map.Entry<String, Integer> e : sorted) {
+                        double pct = e.getValue() * 100.0 / total;
+                        logDirect(String.format("  %5d (%5.1f%%) %s", e.getValue(), pct, e.getKey()));
+                    }
+                });
+                return;
+            }
+
+            // ── Step 2: DBSCAN cluster ────────────────────────────────────────
+            List<List<Indicator>> clusters = dbscan(points, epsilon, minIndicators);
+
+            // ── Step 3: score and filter ──────────────────────────────────────
+            List<Cluster> bases = new ArrayList<>();
+            for (List<Indicator> cl : clusters) {
+                int score = cl.stream().mapToInt(p -> p.weight).sum();
+                if (score < minScore) continue;
+                bases.add(new Cluster(cl, score));
+            }
+            bases.sort(Comparator.comparingInt((Cluster c) -> -c.score));
+
+            if (bases.isEmpty()) {
+                Minecraft.getInstance().execute(() ->
+                    logDirect("No clusters scored ≥ " + minScore + ". Try lowering with "
+                            + "#set baseFinderMinScore <lower>, or widen with "
+                            + "#set baseFinderEpsilon <larger>."));
+                return;
+            }
+
+            // ── Step 4: build result lines, then deliver on the game thread ───
+            int showCount = Math.min(finalTopN, bases.size());
+            List<String> lines = new ArrayList<>();
+            lines.add("══ Detected bases (" + bases.size() + " total, showing top " + showCount + ") ══");
+            for (int i = 0; i < showCount; i++) {
+                Cluster c = bases.get(i);
+                int cx = c.centerX();
+                int cz = c.centerZ();
+                int dx = cx - origin.x;
+                int dz = cz - origin.z;
+                int dist = (int) Math.sqrt(dx * dx + dz * dz);
+                String types = summarizeTypes(c.points);
+                lines.add(String.format(
+                        "%2d. score %4d │ X=%5d Z=%5d │ %2d indicators │ ~%5d blocks │ %s",
+                        i + 1, c.score, cx, cz, c.points.size(), dist, types));
+            }
+
+            // Resolve goto target now (still background thread — list already built).
+            final Cluster gotoTarget = (finalGotoIndex > 0 && finalGotoIndex <= bases.size())
+                    ? bases.get(finalGotoIndex - 1) : null;
+            final int totalBases = bases.size();
+
+            Minecraft.getInstance().execute(() -> {
+                for (String line : lines) logDirect(line);
+                // Drop a JourneyMap waypoint for every displayed base.
+                for (int i = 0; i < showCount; i++) {
+                    Cluster c = bases.get(i);
+                    JourneyMapHelper.addWaypoint(
+                        "Base #" + (i + 1) + " (score " + c.score + ")",
+                        new net.minecraft.core.BlockPos(c.centerX(), 64, c.centerZ()),
+                        JourneyMapHelper.COLOR_BASE);
+                }
+                if (finalGotoIndex > 0) {
+                    if (gotoTarget == null) {
+                        logDirect("Only " + totalBases + " base"
+                                + (totalBases == 1 ? "" : "s") + " found. Cannot goto #" + finalGotoIndex + ".");
+                    } else {
+                        int cx = gotoTarget.centerX();
+                        int cz = gotoTarget.centerZ();
+                        logDirect("→ Pathing to base #" + finalGotoIndex + " at X=" + cx + " Z=" + cz);
+                        baritone.getCustomGoalProcess().setGoalAndPath(new GoalXZ(cx, cz));
+                    }
+                }
+            });
+
+        }, "BaritoneBaseFinder");
+        worker.setDaemon(true);
+        worker.start();
     }
 
     // ── DBSCAN over (x, z) points ────────────────────────────────────────────

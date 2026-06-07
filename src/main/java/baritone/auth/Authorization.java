@@ -83,7 +83,8 @@ public final class Authorization {
         m.put(UUID.fromString("11d5e57c-c11a-4060-82a5-3264ddf5ed41"), "ahigherdesire");        // Mojang
         m.put(UUID.fromString("57d75a53-5f24-30e7-b830-17b0ba591672"), "ahigherdesire (offline)"); // cracked
         m.put(UUID.fromString("d48affbd-1e57-4a6f-8051-f63f46ac9044"), "haoyu");                // Mojang
-        m.put(UUID.fromString("889330b8-f127-3e90-a180-54faefe9d2fd"), "haoyu (offline)");      // cracked
+        m.put(UUID.fromString("889330b8-f127-3e90-a180-54faefe9d2fd"), "haoyu (offline)");      // cracked IGN "haoyu" (lowercase)
+        m.put(UUID.fromString("be4295eb-fb6f-3b9a-a3fb-765a20838ec9"), "Haoyu (offline)");      // cracked IGN "Haoyu" (capital H)
         // ──────────────────────────────────────────────────────────────────────
         ALLOWLIST = Collections.unmodifiableMap(m);
     }
@@ -130,8 +131,7 @@ public final class Authorization {
             authorized = doCheck();
         } catch (Throwable t) {
             Helper.HELPER.logDirect(
-                    Component.literal("[MinecraftAI] Auth check error: " + t.getMessage()
-                            + ". Mod disabled for safety.")
+                    Component.literal("[MinecraftAI] Error 001. Please contact owner.")
                             .withStyle(net.minecraft.ChatFormatting.RED));
             authorized = false;
         }
@@ -155,27 +155,13 @@ public final class Authorization {
         // both Mojang UUIDs and offline-mode UUIDs for each user, so the security
         // trade-off is limited: a third party can only bypass by setting their cracked
         // IGN to exactly match an authorized user's IGN, which is a high social barrier.
-        if (user.getXuid().isEmpty()) {
-            Helper.HELPER.logDirect(
-                    Component.literal("[MinecraftAI] Note: cracked/offline launcher detected. "
-                            + "Auth will check the offline-mode UUID for " + name + ".")
-                            .withStyle(net.minecraft.ChatFormatting.GRAY));
-        }
+        // No message for cracked/offline launchers — just fall through to the allowlist check silently.
 
         // Allowlist check
         if (!ALLOWLIST.containsKey(uuid)) {
             Helper.HELPER.logDirect(
-                    Component.literal("[MinecraftAI] Unauthorized user: " + name + " (UUID " + uuid + ")")
+                    Component.literal("[MinecraftAI] Error 001. Please contact owner.")
                             .withStyle(net.minecraft.ChatFormatting.RED));
-            if (ALLOWLIST.isEmpty()) {
-                Helper.HELPER.logDirect(
-                        Component.literal("[MinecraftAI] (No allowlist entries — edit Authorization.java and rebuild.)")
-                                .withStyle(net.minecraft.ChatFormatting.GRAY));
-            } else {
-                Helper.HELPER.logDirect(
-                        Component.literal("[MinecraftAI] Mod disabled. Contact the mod author for access.")
-                                .withStyle(net.minecraft.ChatFormatting.RED));
-            }
             return false;
         }
 
