@@ -69,6 +69,64 @@ Locks the origin to where you're standing when the command runs, then sets `Goal
 
 ---
 
+## Player tracker and threat alerts
+
+MinecraftAI watches every visible player entity every tick and silently records each sighting to `baritone/player_memory.json`. This happens automatically — you do not need to enable anything.
+
+### `#players` — browse sighting history
+
+```
+#players                    list all recorded players (most recent first)
+#players <name>             show a specific player's full sighting history
+#players goto <name>        path to their last known position
+#players forget <name>      remove a player record (partial name match, case-insensitive)
+#players clear              wipe the entire database
+#players stats              show total player count
+```
+
+**Example workflow:**
+```
+#players                    → see everyone you've spotted recently
+  1. Steve  ~300 blocks  X=1200 Y=64 Z=-400 [overworld]  3 minutes ago
+  2. Alex   ~5000 blocks  X=5000 Y=30 Z=200 [overworld]  2 hours ago
+
+#players Steve              → see Steve's full sighting history with timestamps
+#players goto Steve         → Baritone starts pathing to X=1200 Z=-400
+```
+
+Notes:
+- Up to **20 sightings** are kept per player, newest first.
+- `#players goto` uses `GoalXZ` (targets their X/Z without a specific Y). It will warn if the sighting was in a different dimension than your current one.
+- Data is saved asynchronously, at most once every 15 seconds, so very recent sightings may not survive a crash.
+
+Aliases: `#player`, `#seen`
+
+### `#threats` — proximity alert watcher
+
+When enabled, fires a chat warning the first time any player enters within the configured radius each session.
+
+```
+#threats                    toggle on/off (default: off)
+#threats on                 enable
+#threats off                disable
+#threats <N>                set alert radius to N blocks (default 64, max 2048)
+#threats status             show current state, radius, and cooldown info
+```
+
+Alert message format:
+```
+[Threats] ⚠ PLAYER NEARBY: Steve  X=123 Y=64 Z=456  (~45 blocks)  [overworld]
+```
+
+**Anti-spam rules:**
+- Each player has a **30-second re-alert cooldown**. A player standing next to you won't spam a message every tick.
+- The cooldown **resets** when a player leaves render distance and returns, so you always get a fresh alert if someone sneaks up on you.
+- Disabling threats (`#threats off`) does **not** stop player memory from recording — use `#players` any time to review recent sightings.
+
+Alias: `#threat`
+
+---
+
 ## Chest content memory
 
 MinecraftAI automatically records the contents of every container you open (chests, barrels, shulker boxes, hoppers, droppers, dispensers, furnaces, and more). The data is saved to `baritone/chest_memory.json` and persists across restarts.

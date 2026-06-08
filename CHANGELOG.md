@@ -22,6 +22,18 @@ Added optional [JourneyMap](https://www.curseforge.com/minecraft/mc-mods/journey
 - **Auto-waypoints** — `#structure`/`#where` drop a gold JourneyMap waypoint on found structures. `#bases` drops a purple waypoint for each detected base.
 - **Right-click #goto** — "Baritone #goto" option added to the JourneyMap fullscreen right-click menu. Clicking it starts Baritone pathing to the clicked map position. Useful on multiplayer where JourneyMap's own Teleport is unavailable.
 
+### Player tracker — `#players` · Threat alerts — `#threats`
+New `ThreatsBehavior` runs every game tick and silently records every player entity you can see into `baritone/player_memory.json`. Two commands expose this data:
+
+- **`#players`** — list all recorded players (most-recently seen first), with distance, coordinates, dimension, and "time ago". Aliases: `#player`, `#seen`.
+  - `#players <name>` — full sighting history (up to 20 entries) with timestamps.
+  - `#players goto <name>` — path to that player's last known position via `GoalXZ`.
+  - `#players forget <name>` — remove a player; `#players clear` — wipe database.
+- **`#threats`** — toggle a proximity alert. When ON, fires a chat warning the first time each player enters within the configured radius (default 64 blocks, 3D). Re-alerts after a 30-second cooldown. Alias: `#threat`.
+  - `#threats on/off` — explicit toggle; `#threats <N>` — set radius; `#threats status` — show state.
+- **Player memory is always on** — sightings are recorded regardless of whether threat alerting is enabled. You can use `#players` to review who you've seen even without enabling alerts.
+- **Persistent** — saved to `baritone/player_memory.json` at most once every 15 seconds (throttled async write). Up to 20 sightings retained per player.
+
 ### Chest content memory — `#chest`
 New `#chest` command (aliases `#chests`, `#findchest`) silently records the contents of every container you open and lets you search and navigate to them later.
 

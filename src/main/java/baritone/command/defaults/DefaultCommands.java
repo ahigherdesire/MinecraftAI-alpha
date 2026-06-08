@@ -80,6 +80,8 @@ public final class DefaultCommands {
                 new BasesCommand(baritone),
                 new HeatmapCommand(baritone),
                 new ChestCommand(baritone),
+                new ThreatsCommand(baritone),
+                new PlayersCommand(baritone),
                 new ActivateCommand(baritone)
         ));
         ExecutionControlCommands prc = new ExecutionControlCommands(baritone);

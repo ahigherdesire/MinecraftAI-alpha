@@ -28,6 +28,31 @@ The integration activates automatically if JourneyMap is present and requires no
 
 **Dropped from this update:** the originally-planned `#autoeat`, `#autoflee`, `#autotorch`, and `#autopilot` master toggle were removed because **Meteor Client already provides equivalents** and duplicating them in Baritone wasn't worth the maintenance cost. The design spec for the dropped pieces remains in `UPCOMING.md` as a reference.
 
+## Player intelligence
+
+### Player tracker — `#players`
+
+- **`#players`** — lists every player ever seen, sorted by most-recently spotted. Each entry shows name, horizontal distance from you now, last-seen coordinates, dimension, and time elapsed since last sighting.
+  - **`#players <name>`** — full sighting history for that player (up to 20 entries newest-first), with ISO timestamps and coordinates.
+  - **`#players goto <name>`** — sets a `GoalXZ` goal at their last known X/Z position and starts pathing. Warns if the sighting was in a different dimension.
+  - **`#players forget <name>`** — removes the player's entire record. Partial, case-insensitive name matching.
+  - **`#players clear`** — wipe the entire database.
+  - **`#players stats`** — show total player count in memory.
+- **Always-on recording** — `ThreatsBehavior` scans `ClientLevel.players()` every tick and records every non-self player entity. No enable required; data accumulates automatically from the moment you load a world.
+- **Persistent** — saved to `baritone/player_memory.json` (throttled async write, at most once per 15 s). Up to 20 sightings per player retained.
+- Aliases: `#player`, `#seen`.
+
+### Threat alerts — `#threats`
+
+- **`#threats`** — toggles proximity alerts. When ON, fires an in-chat warning the first time each player enters within the configured radius each session.
+  - Alert format: `[Threats] ⚠ PLAYER NEARBY: Steve  X=123 Y=64 Z=456  (~45 blocks)  [overworld]`
+  - **`#threats on/off`** — explicit toggle.
+  - **`#threats <N>`** — set alert radius in blocks (1–2048; default 64). Distance check is 3D Euclidean.
+  - **`#threats status`** — show whether enabled, current radius, and cooldown.
+- **Anti-spam** — 30-second re-alert cooldown per player. Cooldown resets if the player leaves render distance and comes back, so a player stalking you will always trigger a fresh alert.
+- **Player memory is independent** — disabling threats stops alerts but does NOT stop recording sightings. Use `#threats off` freely; `#players` data keeps accumulating.
+- Alias: `#threat`.
+
 ## Cache intelligence
 
 ### Chest content memory

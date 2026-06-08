@@ -4,6 +4,7 @@ A Minecraft pathfinding bot forked from [Baritone](https://github.com/cabaletta/
 
 > ## What's new in this fork
 >
+> - 👁️ **`#threats`** / **`#players`** — proximity alerts + persistent player sighting log; see everyone who's been near you and navigate to their last position
 > - 🧱 **`#chest <item>`** — silently records every container you open; search by item name and navigate to the result
 > - 🔥 **`#heatmap`** — live JourneyMap overlay scoring every 32×32 block cell by player-activity indicators (blue → yellow → red)
 > - 🏠 **`#bases`** — DBSCAN cluster analysis of the chunk cache to surface likely player bases
@@ -50,6 +51,10 @@ Type commands in chat with the `#` prefix:
 #heatmap                    → draw a live heat overlay on JourneyMap showing player-activity zones
 #chest diamond              → find every recorded chest that had diamonds in it
 #chest diamond goto         → find and immediately path to the nearest one
+#threats on                 → alert in chat whenever a player comes within 64 blocks
+#threats 128                → change alert radius to 128 blocks
+#players                    → list all players you've ever seen (name, coords, time ago)
+#players Steve goto         → path to Steve's last known position
 #stop                       → stop everything
 #help                       → list all commands with descriptions and tab completion
 ```
@@ -62,6 +67,31 @@ Type commands in chat with the `#` prefix:
 (Auto-eat / auto-flee / auto-torch were dropped — Meteor Client already does them.)
 
 ## What's new in this fork
+
+### 👁️ Player tracker + Threat alerts
+
+`ThreatsBehavior` runs every tick and silently records every player entity you can see — saving name, UUID, position, and dimension to `baritone/player_memory.json`. No configuration needed; it just happens.
+
+**`#players`** — query the database:
+```
+#players                    → list all known players (most-recent first)
+#players Steve              → Steve's full sighting history with timestamps
+#players goto Steve         → path to Steve's last known position
+#players forget Steve       → remove Steve from the database
+#players clear              → wipe everything
+```
+Aliases: `#player`, `#seen`
+
+**`#threats`** — proximity alerts when enabled:
+```
+#threats                    → toggle on/off
+#threats on                 → enable (default radius 64 blocks)
+#threats 128                → set radius to 128 blocks
+#threats status             → show current state and radius
+```
+Alert message example: `[Threats] ⚠ PLAYER NEARBY: Steve  X=123 Y=64 Z=456  (~45 blocks)  [overworld]`
+
+Re-alerts after 30 seconds if the player stays in range. Cooldown resets if they leave and come back. Player memory is always recorded regardless of alert state. Alias: `#threat`
 
 ### 🛡️ Autopilot Survival 🧪 *experimental*
 A reactive watcher that walks you to the nearest cached bed when night falls (or during a thunderstorm). Toggle with `#autosleep`. Won't interrupt active tasks unless `autoSleepInterruptTasks=true`. Prints a one-time warning when enabled.
