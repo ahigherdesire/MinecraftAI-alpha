@@ -2,15 +2,16 @@
 
 A Minecraft pathfinding bot forked from [Baritone](https://github.com/cabaletta/baritone), updated for **Minecraft 26.1.2** (Java 25, Fabric 0.18.4) with several new features.
 
-> ## 🛡️ Autopilot Survival &nbsp;·&nbsp; 🧪 EXPERIMENTAL
+> ## What's new in this fork
 >
-> - `#autosleep` — navigate to the nearest cached bed when night falls
+> - 🧱 **`#chest <item>`** — silently records every container you open; search by item name and navigate to the result
+> - 🔥 **`#heatmap`** — live JourneyMap overlay scoring every 32×32 block cell by player-activity indicators (blue → yellow → red)
+> - 🏠 **`#bases`** — DBSCAN cluster analysis of the chunk cache to surface likely player bases
+> - 🛡️ **`#autosleep`** 🧪 — navigate to bed automatically at night *(experimental)*
+> - 🗺️ **`#structure`** / **`#where`** — find any structure in singleplayer or multiplayer (seed-based)
+> - ✈️ **`#elytra`** — now works in the Overworld and any dimension, not just the Nether
 >
-> ⚠️ **Experimental** — may misfire or interact poorly with other Baritone processes. Prints a one-time in-chat warning when enabled. Toggle off with `#autosleep off`.
->
-> The originally-planned auto-eat / auto-flee / auto-torch / `#autopilot` master toggle have been **dropped** — Meteor Client already covers them. Death-point waypointing remains free via Baritone's built-in `doDeathWaypoints` (on by default).
->
-> See [CHANGELOG.md](CHANGELOG.md) for details.
+> See [CHANGELOG.md](CHANGELOG.md) for the full list.
 
 ## Download & setup
 
@@ -47,6 +48,8 @@ Type commands in chat with the `#` prefix:
 #runaway 50                 → flee 50 blocks away from the current position
 #bases                      → find likely player bases by clustering cached indicator blocks
 #heatmap                    → draw a live heat overlay on JourneyMap showing player-activity zones
+#chest diamond              → find every recorded chest that had diamonds in it
+#chest diamond goto         → find and immediately path to the nearest one
 #stop                       → stop everything
 #help                       → list all commands with descriptions and tab completion
 ```
@@ -126,6 +129,43 @@ Navigates to the nearest nether portal. Portal blocks are tracked in Baritone's 
 ```
 
 Aliases: `#portal`, `#findportal`
+
+### `#bases` — find player bases
+Scans Baritone's chunk cache for clusters of "base indicator" blocks (beacons, ender chests, enchanting tables, anvils, shulker boxes, brewing stands, beds, chests) and ranks them by weighted score. Pure cache read — no packets, no anticheat surface. If JourneyMap is installed, drops a purple waypoint on every detected base.
+
+```
+#bases              → top 10 likely bases in current dimension
+#bases 20           → top 20
+#bases pie          → indicator type breakdown
+#bases 3 goto       → path to the 3rd base
+```
+
+Alias: `#basefinder`
+
+### `#heatmap` — activity heat overlay
+Scores every 32×32-block cell in the cache by density of player-indicator blocks and draws live coloured rectangles on the JourneyMap fullscreen map — 🔵 blue (cold) → 🟡 yellow (moderate) → 🔴 red (very hot). A **"Heat"** toggle button in JM's toolbar shows/hides the overlay without re-scanning. Includes broader signals than `#bases`: nether portals, hoppers, observers, player heads, jukeboxes.
+
+```
+#heatmap            → scan + draw overlay (top 10 in chat)
+#heatmap 20         → top 20 in chat
+#heatmap 3 goto     → path to the 3rd hotspot
+```
+
+Alias: `#activity`
+
+### `#chest` — chest content memory
+Every container you open (chest, barrel, shulker box, hopper, dropper, furnace…) is silently recorded to `baritone/chest_memory.json`. Search that database by item name at any time to find and navigate to specific loot.
+
+```
+#chest diamond           → list every recorded chest that had diamonds
+#chest diamond goto      → find + immediately walk there
+#chest 2 goto            → walk to the 2nd result from the last search
+#chest list              → browse all recorded containers
+#chest forget 1          → remove a stale entry
+#chest clear             → wipe the database
+```
+
+Aliases: `#chests`, `#findchest`
 
 ### Elytra in the overworld (and any dimension)
 `#elytra` previously did nothing outside the Nether. It now works in the overworld, the End, and any custom dimension:

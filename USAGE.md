@@ -69,6 +69,57 @@ Locks the origin to where you're standing when the command runs, then sets `Goal
 
 ---
 
+## Chest content memory
+
+MinecraftAI automatically records the contents of every container you open (chests, barrels, shulker boxes, hoppers, droppers, dispensers, furnaces, and more). The data is saved to `baritone/chest_memory.json` and persists across restarts.
+
+```
+#chest <item>           → search for containers holding <item>
+#chest <item> goto      → search and path to top result immediately
+#chest <N> goto         → path to the N'th result from the last search
+#chest list             → browse all recorded containers (8 per page)
+#chest list <page>      → go to a specific page of the list
+#chest stats            → show total containers recorded
+#chest forget <N>       → remove N'th last-search result from database
+#chest clear            → wipe the entire database
+```
+
+Aliases: `#chests`, `#findchest`
+
+### How recording works
+
+1. Open any container normally — no command needed.
+2. When you close the screen MinecraftAI captures the block position (from the raycast at the moment the screen opened) and reads all non-air items in the container's own slots (your player inventory slots are excluded).
+3. The record is written to disk asynchronously in the background.
+
+### Search tips
+
+- Search is **partial, case-insensitive**. `#chest sword` matches `diamond_sword`, `iron_sword`, `netherite_sword`, etc.
+- Results are sorted by **total matched quantity** (most items first).
+- After searching, results are cached: `#chest 1 goto` navigates to the top result without re-searching.
+- `#chest forget <N>` removes a stale or looted chest from the database.
+
+### Example workflow
+
+```
+#chest diamond
+══ Chests with "diamond" — 3 found, showing top 3 ══
+  1. X=123 Y=64 Z=456 [overworld] ~820 away — 64× diamond, 12× diamond_sword
+  2. X=-800 Y=30 Z=200 [overworld] ~2048 away — 5× diamond_pickaxe
+  3. X=0 Y=128 Z=0 [nether] ~1234 away — 30× diamond_ore
+
+#chest 1 goto           → Baritone walks to X=123 Y=64 Z=456
+```
+
+### Notes
+
+- Records only containers **you've personally opened**. The bot can't see what you haven't visited.
+- Contents may be **stale** — other players could have looted a chest since you last opened it.
+- Re-opening a chest **updates** its record with the current contents.
+- Pure client-side — no server interaction, no anticheat surface.
+
+---
+
 ## Base finder
 
 ```

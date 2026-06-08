@@ -22,6 +22,15 @@ Added optional [JourneyMap](https://www.curseforge.com/minecraft/mc-mods/journey
 - **Auto-waypoints** — `#structure`/`#where` drop a gold JourneyMap waypoint on found structures. `#bases` drops a purple waypoint for each detected base.
 - **Right-click #goto** — "Baritone #goto" option added to the JourneyMap fullscreen right-click menu. Clicking it starts Baritone pathing to the clicked map position. Useful on multiplayer where JourneyMap's own Teleport is unavailable.
 
+### Chest content memory — `#chest`
+New `#chest` command (aliases `#chests`, `#findchest`) silently records the contents of every container you open and lets you search and navigate to them later.
+
+- **Automatic recording** — open any chest, barrel, shulker box, hopper, or other container and its contents are saved to `baritone/chest_memory.json`. No command needed; it just happens.
+- **Search by item** — `#chest diamond` finds every recorded chest that contained a diamond variant, sorted by quantity. Partial, case-insensitive matching: `sword` matches `diamond_sword`, `iron_sword`, etc.
+- **Navigate** — `#chest diamond goto` paths to the best match immediately; `#chest 2 goto` paths to the second result from the last search.
+- **Housekeeping** — `#chest list` browses all recorded containers, `#chest forget <N>` removes a result, `#chest clear` wipes the database.
+- **Persistent** — survives restarts. Database is plain JSON at `baritone/chest_memory.json` — human-readable and editable.
+
 ### Cache intelligence — `#heatmap`
 New `#heatmap` command (alias `#activity`) scores every **32×32-block chunk cell** in the cache by weighted player-indicator density and displays results in chat and on the JourneyMap fullscreen map.
 

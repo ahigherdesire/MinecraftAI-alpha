@@ -79,6 +79,7 @@ public final class DefaultCommands {
                 new AutoSleepCommand(baritone),
                 new BasesCommand(baritone),
                 new HeatmapCommand(baritone),
+                new ChestCommand(baritone),
                 new ActivateCommand(baritone)
         ));
         ExecutionControlCommands prc = new ExecutionControlCommands(baritone);

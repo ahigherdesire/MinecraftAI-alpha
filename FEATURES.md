@@ -13,7 +13,8 @@ MinecraftAI is access-controlled via **RSA-signed license tokens**. No UUID conf
 
 When [JourneyMap](https://www.curseforge.com/minecraft/mc-mods/journeymap) is installed alongside this mod:
 
-- **Auto-waypoints** — `#structure` and `#where` automatically drop a **gold** JourneyMap waypoint when a structure is found. `#bases` drops a **purple** waypoint for each detected base cluster.
+- **Auto-waypoints** — `#structure` and `#where` automatically drop a **gold** JourneyMap waypoint when a structure is found. `#bases` drops a **purple** waypoint for each detected base cluster. `#heatmap` drops a waypoint at every top-N hotspot centre.
+- **Heatmap overlay** — `#heatmap` draws colored 32×32-block polygons across the fullscreen map (blue → yellow → red by activity score). A **"Heat"** toggle button in JM's addon toolbar shows/hides the overlay without re-scanning.
 - **Right-click #goto** — right-clicking anywhere on the fullscreen map shows a **"Baritone #goto"** option. Clicking it sends Baritone to that map position. Works on multiplayer where JourneyMap's own Teleport option is greyed out.
 
 The integration activates automatically if JourneyMap is present and requires no configuration.
@@ -28,6 +29,15 @@ The integration activates automatically if JourneyMap is present and requires no
 **Dropped from this update:** the originally-planned `#autoeat`, `#autoflee`, `#autotorch`, and `#autopilot` master toggle were removed because **Meteor Client already provides equivalents** and duplicating them in Baritone wasn't worth the maintenance cost. The design spec for the dropped pieces remains in `UPCOMING.md` as a reference.
 
 ## Cache intelligence
+
+### Chest content memory
+
+- **`#chest <item>`** — search every container you've ever opened for items matching the query. Results are sorted by total quantity and show the chest's coordinates, dimension, and matched item counts.
+  - **Automatic capture** — every time you open a chest, barrel, shulker box, hopper, dropper, or other container, MinecraftAI silently records its BlockPos and contents. Nothing to enable.
+  - **Partial search** — `#chest diamond` matches `minecraft:diamond`, `minecraft:diamond_sword`, `minecraft:diamond_ore`, etc. Case-insensitive.
+  - **Navigate** — append `goto` to immediately path to the best result: `#chest diamond goto`. Or search first, then use `#chest <N> goto` for the Nth result.
+  - **Housekeeping** — `#chest list` browses all recorded containers (paginated); `#chest forget <N>` removes a record; `#chest clear` wipes everything; `#chest stats` shows database size.
+  - **Persistent** — saved to `baritone/chest_memory.json` and reloaded automatically on every session.
 
 ### Activity heatmap
 
