@@ -19,6 +19,8 @@ package baritone.util;
 
 import net.minecraft.core.BlockPos;
 
+import java.util.List;
+
 /**
  * Optional JourneyMap integration.
  *
@@ -100,6 +102,7 @@ public final class JourneyMapHelper {
         if (subscribed || !isAvailable()) return;
         try {
             JourneyMapBridge.subscribePopupMenu();
+            JourneyMapBridge.subscribeHeatmapButton();
             subscribed = true;
         } catch (Throwable t) {
             // JM API changed — fail silently.
@@ -107,4 +110,34 @@ public final class JourneyMapHelper {
     }
 
     private static volatile boolean subscribed = false;
+
+    /**
+     * Draws a visual heatmap on the JourneyMap fullscreen map — one colored
+     * 512×512 rectangle per cell, shaded from blue (low) to red (high score).
+     * Replaces any previous heatmap overlay. Silently does nothing if JM is absent.
+     *
+     * @param cells    list of {centerX, centerZ, score}
+     * @param maxScore score of the hottest cell for colour normalisation
+     */
+    public static void showHeatmap(List<int[]> cells, int maxScore) {
+        if (!isAvailable()) return;
+        try {
+            JourneyMapBridge.showHeatmap(cells, maxScore);
+        } catch (Throwable t) {
+            // JM API changed or unavailable — fail silently.
+        }
+    }
+
+    /**
+     * Removes all heatmap polygon overlays from JourneyMap.
+     * Silently does nothing if JM is absent.
+     */
+    public static void clearHeatmap() {
+        if (!isAvailable()) return;
+        try {
+            JourneyMapBridge.clearHeatmap();
+        } catch (Throwable t) {
+            // fail silently
+        }
+    }
 }

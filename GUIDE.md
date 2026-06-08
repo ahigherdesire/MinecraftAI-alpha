@@ -37,7 +37,7 @@ If you've used vanilla Baritone before, the **What's new** sections at the end o
 
 **Install steps**
 1. Install [Fabric Loader 0.18.4](https://fabricmc.net/use/) for MC 26.1.2.
-2. Drop `miencraftai-dirty.jar` into your Minecraft `mods/` folder.
+2. Drop `minecraftai-dirty.jar` into your Minecraft `mods/` folder.
 3. Launch Minecraft. A `baritone/` folder appears in your game directory — that's the cache + settings.
 
 **First launch check**

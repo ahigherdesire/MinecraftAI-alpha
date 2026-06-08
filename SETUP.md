@@ -8,7 +8,7 @@
 ## Installing the mod
 
 1. Install [Fabric Loader 0.18.4](https://fabricmc.net/use/) for Minecraft 26.1.2.
-2. Copy `build/libs/miencraftai-dirty.jar` into your `mods/` folder.
+2. Copy `build/libs/minecraftai-dirty.jar` into your `mods/` folder.
 3. Launch Minecraft. You should see `baritone/` created in your game directory.
 
 ## Activating your license

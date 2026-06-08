@@ -14,7 +14,7 @@ A Minecraft pathfinding bot forked from [Baritone](https://github.com/cabaletta/
 
 ## Download & setup
 
-1. Drop `build/libs/miencraftai-dirty.jar` into your `mods/` folder alongside Fabric Loader 0.18.4.
+1. Drop `build/libs/minecraftai-dirty.jar` into your `mods/` folder alongside Fabric Loader 0.18.4.
 2. Launch Minecraft. On first command you'll see:
    ```
    [MinecraftAI] Type #activate <token> to activate.

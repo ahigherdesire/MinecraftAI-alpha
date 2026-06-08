@@ -30,12 +30,19 @@ $privKey = (Get-Content $privKeyFile -Raw).Trim()
 $token   = java -cp $toolsDir LicenseSigner $privKey $Name $Days
 if ($LASTEXITCODE -ne 0) { Write-Error "Signing failed."; exit 1 }
 
+$today  = (Get-Date).ToString("yyyy-MM-dd")
 $expiry = (Get-Date).AddDays($Days).ToString("yyyy-MM-dd")
+
 Write-Host ""
 Write-Host "=== License for: $Name  (expires $expiry) ===" -ForegroundColor Green
 Write-Host ""
 Write-Host $token
 Write-Host ""
-Write-Host "Tell them to type this in Minecraft chat:" -ForegroundColor Cyan
+Write-Host "Please type this into the minecraft chat." -ForegroundColor Cyan
 Write-Host "  #activate $token"
+Write-Host "Do not share this with anyone." -ForegroundColor Yellow
+Write-Host "Valid for: $Days days."
+Write-Host "Username: $Name"
+Write-Host "Licensed exp: $expiry"
+Write-Host "Awarded licence on: $today"
 Write-Host ""
