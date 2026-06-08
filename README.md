@@ -46,6 +46,7 @@ Type commands in chat with the `#` prefix:
 #sleep                      → go to the nearest bed and sleep when night falls
 #runaway 50                 → flee 50 blocks away from the current position
 #bases                      → find likely player bases by clustering cached indicator blocks
+#heatmap                    → draw a live heat overlay on JourneyMap showing player-activity zones
 #stop                       → stop everything
 #help                       → list all commands with descriptions and tab completion
 ```
@@ -139,6 +140,7 @@ If [JourneyMap](https://www.curseforge.com/minecraft/mc-mods/journeymap) is inst
 
 - **`#structure`** and **`#where`** automatically drop a gold waypoint on the map when a structure is found.
 - **`#bases`** drops a purple waypoint for every detected base cluster.
+- **`#heatmap`** draws colored 32×32-block rectangles across the whole map — 🔵 blue to 🔴 red by activity score. A **"Heat"** toggle button in JM's toolbar shows/hides the overlay.
 - **Right-click anywhere on the fullscreen map** → select **"Baritone #goto"** → the bot starts pathing there. Works on multiplayer where JourneyMap's built-in Teleport is unavailable.
 
 No extra configuration — the integration activates automatically if JourneyMap is present.

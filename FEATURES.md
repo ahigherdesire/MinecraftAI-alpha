@@ -27,6 +27,17 @@ The integration activates automatically if JourneyMap is present and requires no
 
 **Dropped from this update:** the originally-planned `#autoeat`, `#autoflee`, `#autotorch`, and `#autopilot` master toggle were removed because **Meteor Client already provides equivalents** and duplicating them in Baritone wasn't worth the maintenance cost. The design spec for the dropped pieces remains in `UPCOMING.md` as a reference.
 
+## Cache intelligence
+
+### Activity heatmap
+
+- **`#heatmap`** — scores every **32×32-block chunk cell** in Baritone's cache by weighted density of player-indicator blocks and draws a live colour overlay on the JourneyMap fullscreen map.
+  - **Color scale:** 🔵 blue (cold) → 🟡 yellow (moderate) → 🔴 red (very hot). Hottest cell = red; all others scaled relative to it.
+  - **Toggle button:** a **"Heat"** button in JourneyMap's addon toolbar shows/hides the overlay without re-scanning.
+  - **Broader signals than `#bases`:** includes nether portals, hoppers, observers, player heads, jukeboxes alongside the standard base-quality blocks.
+  - **Workflow:** `#heatmap` → spot red cluster on JM map → `#bases` inside that area for the exact base footprint.
+  - Subcommands: `#heatmap` (top 10), `#heatmap <N>`, `#heatmap <N> goto`. Alias: `#activity`.
+
 ## Base finder
 
 - **`#bases`** — Scans Baritone's per-dimension chunk cache for **clusters** of "base indicator" blocks (beacons, ender chests, enchanting tables, anvils, shulkers, brewing stands, beds, chests). Each cluster gets a weighted score; the top N are likely player bases.

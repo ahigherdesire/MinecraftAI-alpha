@@ -22,6 +22,15 @@ Added optional [JourneyMap](https://www.curseforge.com/minecraft/mc-mods/journey
 - **Auto-waypoints** — `#structure`/`#where` drop a gold JourneyMap waypoint on found structures. `#bases` drops a purple waypoint for each detected base.
 - **Right-click #goto** — "Baritone #goto" option added to the JourneyMap fullscreen right-click menu. Clicking it starts Baritone pathing to the clicked map position. Useful on multiplayer where JourneyMap's own Teleport is unavailable.
 
+### Cache intelligence — `#heatmap`
+New `#heatmap` command (alias `#activity`) scores every **32×32-block chunk cell** in the cache by weighted player-indicator density and displays results in chat and on the JourneyMap fullscreen map.
+
+- **Per-chunk precision** — 32×32 cells so a base's storage room appears as a tight hot cluster, not a vague blob.
+- **Visual heatmap overlay** — colored rectangles drawn on the JM fullscreen map: 🔵 blue (low) → 🟡 yellow (moderate) → 🔴 red (very hot). Up to 1 000 cells rendered simultaneously.
+- **Toggle button** — a **"Heat"** toggle button in JourneyMap's addon toolbar shows/hides the overlay without re-scanning. Cached data persists until the next `#heatmap` run.
+- **Broader indicator set** — adds nether portals (8), hoppers (10), observers (8), player heads (20), jukeboxes (6) on top of the base-quality blocks used by `#bases`.
+- **Workflow:** run `#heatmap` → red cluster found → open JM map → zoom in → run `#bases` to pinpoint exact base footprint.
+
 ### Bug fixes
 - **`#bases` game freeze** — the entire scan (35+ cache reads + DBSCAN) now runs on a background thread. Results are delivered to the game thread when ready. No more tick stutter.
 - **`#structure village` "cannot find"** — the `#minecraft:village` structure tag was empty in MC 26.1.2. Village lookup now uses direct structure IDs (`village_plains`, `village_desert`, `village_savanna`, `village_snowy`, `village_taiga`). Added zero-variant guard so future empty tags produce a clear error rather than a silent null search.

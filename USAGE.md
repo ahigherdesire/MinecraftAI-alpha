@@ -112,6 +112,53 @@ Reads Baritone's per-dimension chunk cache, finds clusters of base-indicator blo
 
 Aliases: `#basefinder`.
 
+---
+
+## Activity heatmap
+
+```
+#heatmap           → scan cache, show top 10 zones in chat, draw all on JourneyMap
+#heatmap 20        → top 20 in chat
+#heatmap 3 goto    → path to the 3rd hottest zone
+```
+
+Scores every **32×32-block chunk cell** in the cache by the density of player-indicator blocks and displays a live colour overlay on the JourneyMap fullscreen map.
+
+**Color scale:**
+- 🔵 Blue — low activity (a chest or two)
+- 🟡 Yellow — moderate (some crafting/storage blocks)
+- 🔴 Red — very hot (dense cluster of high-value blocks — likely a base)
+
+The scale is **relative** — the hottest cell found = red, everything else is proportional. Your own base will be red if it's the most block-dense area you've explored.
+
+**JourneyMap toggle button:**
+Open the JM fullscreen map → find the **"Heat"** button in the addon toolbar (top row). Click to toggle the overlay on/off without re-scanning. The data stays cached until you run `#heatmap` again.
+
+**Indicator weights:**
+
+| Block | Weight | Block | Weight |
+|---|---|---|---|
+| Dragon egg | 100 | Hopper | 10 |
+| Beacon | 50 | Player head | 20 |
+| Ender chest | 30 | Nether portal | 8 |
+| Enchanting table | 25 | Observer | 8 |
+| Shulker box (any) | 15 | Jukebox | 6 |
+| Brewing stand | 15 | Trapped chest | 6 |
+| Anvil | 15 | Chest | 3 |
+| Bed (any) | 5 | Furnace | 3 |
+
+**Recommended workflow:**
+1. `#heatmap` — identify red zones on the JM map
+2. Fly to a red zone
+3. `#bases` — DBSCAN-cluster the exact base footprint inside that zone
+
+**Notes:**
+- Pure cache reader — no packets, no live scan, no anticheat surface.
+- Only covers chunks you've explored. Elytra-fly at high altitude with `chunkCaching=true` to populate the cache.
+- Per-dimension — run separately in Overworld, Nether, and End.
+- Up to 1 000 cells shown on the map overlay for performance.
+
+Aliases: `#activity`.
 
 ---
 
