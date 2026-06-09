@@ -37,6 +37,15 @@ CLAUDE.local.md
 # License system — private key must NEVER be committed
 # If you lose this file you cannot generate new licenses without a full keypair rotation.
 private_key.b64
+
+# License generator UI — local tool only, not for distribution
+tools/license_ui.ps1
+tools/license_log.json
+
+# Website — server script embeds private key path; trial log tracks IP addresses
+website/server.ps1
+website/server.js
+website/trial_log.json
 # Copyright Files
 !/.idea/copyright/Baritone.xml
 !/.idea/copyright/profiles_settings.xml
