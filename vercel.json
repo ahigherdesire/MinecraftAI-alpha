@@ -1,10 +1,5 @@
 {
   "outputDirectory": "website",
-  "functions": {
-    "api/trial.js": {
-      "runtime": "nodejs20.x"
-    }
-  },
   "rewrites": [
     { "source": "/api/trial", "destination": "/api/trial.js" }
   ]
